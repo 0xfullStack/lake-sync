@@ -1,18 +1,8 @@
+#[macro_use]
+extern crate diesel;
+
 mod chain;
 mod db;
-
-
-//
-// async fn say_hello() {
-//     println!("my tokio");
-// }
-//
-// #[tokio::main]
-// async fn main() {
-//     let op = say_hello();
-//     println!("hello");
-//     op.await;
-// }
 
 use std::thread;
 use std::thread::Builder;

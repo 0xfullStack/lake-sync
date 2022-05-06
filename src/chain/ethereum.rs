@@ -18,7 +18,6 @@ use hex_literal::hex;
 use web3::ethabi::TopicFilter;
 use web3::types::{BlockNumber, Filter};
 use crate::db::models::Pair;
-use crate::db::postgres::NewPair;
 
 pub struct Ethereum;
 
@@ -40,7 +39,7 @@ impl Ethereum  {
     //     balance
     // }
 
-    pub async fn start_sync_from(&self, index: i64) -> Result<NewPair, Error> {
+    pub async fn start_sync_from(&self, index: i64) -> Result<Pair, Error> {
 
         dotenv::dotenv().ok();
         let node_http = &env::var("INFURA_MAINNET_HTTP").unwrap();
@@ -64,7 +63,7 @@ impl Ethereum  {
         // let token_reserves = pair_contract.query("getReserves", (), None, Options::default(), None).await.unwrap();
 
 
-        let new_pair = NewPair {
+        let new_pair = Pair {
             pair_address: w3h::to_string(&pair_address),
             pair_index: index,
             token0: w3h::to_string(&pair_token0),
