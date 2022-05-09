@@ -1,4 +1,20 @@
+use std::env;
+use dotenv::dotenv;
+use std::sync::Arc;
+use std::str::FromStr;
+use super::models::{NewPair, NewProtocol};
 
+use tokio;
+use ethers::prelude::*;
+use ethers::contract::Contract;
+use ethers::types::{U64, Address};
+use ethers::providers::HttpClientError;
+
+pub struct Subscriber {
+    pub node_url: String,
+    pub factory_address: Address,
+    client: Arc<Provider::<Ws>>,
+}
 
 // #[tokio::main]
 // async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {

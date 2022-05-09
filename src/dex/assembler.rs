@@ -1,6 +1,7 @@
 use std::env;
 use dotenv::dotenv;
 use std::sync::Arc;
+use std::str::FromStr;
 use super::models::{NewPair, NewProtocol};
 
 use tokio;
@@ -8,7 +9,7 @@ use ethers::prelude::*;
 use ethers::contract::Contract;
 use ethers::providers::{JsonRpcClient, Http};
 use ethers::types::{U64, Address};
-use std::str::FromStr;
+use ethers::providers::HttpClientError;
 
 // Generate the type-safe contract bindings by providing the ABI definition
 abigen!(
@@ -27,9 +28,6 @@ abigen!(
 //         function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)
 //     ]"#,
 // );
-
-use ethers::providers::HttpClientError;
-use crate::db::schema::pairs::reserve0;
 
 pub struct Assembler {
     pub node_url: String,
@@ -68,7 +66,6 @@ impl Assembler {
         let (reserve0_, reserve1_, _) = pair_contract.get_reserves().call().await.unwrap();
         // let mid_price = f64::powi(10.0, 18 - 6) * reserve1 as f64 / reserve0 as f64;
 
-        // reserve0
         Ok(
             NewPair {
                 pair_address: address.to_string(),
