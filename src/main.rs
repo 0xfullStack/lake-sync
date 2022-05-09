@@ -6,7 +6,6 @@ mod dex;
 mod abi;
 
 use std::{env, thread};
-use diesel::query_dsl::InternalJoinDsl;
 use env_logger::Env;
 use dotenv::dotenv;
 use ethers::prelude::U256;

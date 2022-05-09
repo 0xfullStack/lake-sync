@@ -26,9 +26,9 @@ impl Subscriber {
         }
     }
 
-    pub fn star_watching(&self) -> std::io::Result<()> {
-        // self.pair_created_event();
-        self.pair_sync_event();
+    pub async fn star_watching(&self) -> std::io::Result<()> {
+        self.pair_created_event().await;
+        self.pair_sync_event().await;
         Result::Ok(())
     }
 
@@ -37,6 +37,7 @@ impl Subscriber {
     pub async fn pair_created_event(&self) {
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
+
         let provider = Provider::new(ws).interval(Duration::from_millis(500));
 
         let block_number = BlockNumber::Number(U64::from(10000835));
@@ -45,8 +46,18 @@ impl Subscriber {
             .from_block(block_number);
 
         let mut stream = provider.subscribe_logs(&filter).await.unwrap();
-        while let Some(log) = stream.next().await {
-            dbg!(log);
+
+        while let next = stream.next().await {
+            match next {
+                Some(log) => {
+                    dbg!(log);
+                },
+                None => {
+                    println!("pari created error occur");
+                    stream.unsubscribe().await;
+                    break;
+                }
+            }
         }
     }
 
@@ -61,8 +72,17 @@ impl Subscriber {
             .from_block(block_number);
 
         let mut stream = provider.subscribe_logs(&filter).await.unwrap();
-        while let Some(log) = stream.next().await {
-            dbg!(log);
+        while let next = stream.next().await {
+            match next {
+                Some(log) => {
+                    dbg!(log);
+                },
+                None => {
+                    println!("sync error occur");
+                    stream.unsubscribe().await;
+                    break;
+                }
+            }
         }
     }
 
