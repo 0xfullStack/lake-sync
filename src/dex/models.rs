@@ -1,7 +1,7 @@
 use diesel::prelude::*;
+use diesel::{Insertable};
 use diesel::table;
-use crate::db::schema::pairs::dsl::{id as pair_id, *};
-use crate::db::schema::protocols::dsl::{id as protocol_id, name as protocol_name, *};
+use crate::db::schema::{protocols, pairs};
 
 #[derive(Insertable, Debug)]
 #[table_name="protocols"]
@@ -47,6 +47,7 @@ impl NewProtocol {
             .values(&protocol)
             .execute(conn)
     }
+
     pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
         QueryResult::Ok(1)
     }
@@ -59,7 +60,7 @@ impl NewPair {
             .values(&pair)
             .execute(conn)
     }
-    pub fn update_pair(new_pair: Pair, conn: &PgConnection) -> QueryResult<usize> {
+    pub fn update_pair(new_pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
         QueryResult::Ok(1)
     }
 }

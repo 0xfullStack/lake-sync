@@ -7,36 +7,59 @@ mod dex;
 use std::thread;
 use std::thread::Builder;
 
-fn main() {
-    let child = thread::spawn(|| {
-        println!("Thread");
-        "Much concurrent. such wow".to_string()
-    });
+use std::env;
+use env_logger;
+use env_logger::Env;
+use dotenv::dotenv;
+use web3::types::U256;
+use dex::assembler;
+use crate::assembler::Assembler;
 
-    print!("Hello ");
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
 
-    let value = child.join().expect("Failed joining child thread");
+    // dotenv().ok();
+    // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    //
+    // let child = thread::spawn(|| {
+    //     println!("Thread");
+    //     "Much concurrent. such wow".to_string()
+    // });
+    //
+    // print!("Hello ");
+    //
+    // let value = child.join().expect("Failed joining child thread");
+    //
+    // println!("{}", value);
+    //
+    //
+    // let my_thread = Builder::new().name("Worker Thred".to_string()).stack_size(1024 * 4);
+    // let handle = my_thread.spawn(|| {
+    //     panic!("Oops");
+    // });
+    //
+    // let child_status = handle.unwrap().join();
+    // // println!("Child status: {}", child_status);
+    //
+    // let nums = String::from("damn your fucking ashole");
+    // let _ = thread::spawn( move || {
+    //     println!("{}", nums);
+    // });
 
-    println!("{}", value);
+    env_logger::init();
+    dotenv::dotenv().ok();
 
+    // let node_url = env::var("INFURA_MAINNET").unwrap().as_str();
+    let assembler = Assembler::make(
+        String::from("https://mainnet.infura.io/v3/c60b0bb42f8a4c6481ecd229eddaca27"),
+        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
+    );
 
-    let my_thread = Builder::new().name("Worker Thred".to_string()).stack_size(1024 * 4);
-    let handle = my_thread.spawn(|| {
-        panic!("Oops");
-    });
+    let address = assembler.fetch_pair_address(U256::from(1)).await.unwrap();
+    let result = assembler.fetch_pair_info(address, U256::from(1)).await.unwrap();
+    println!("{:?}", result);
 
-    let child_status = handle.unwrap().join();
-    // println!("Child status: {}", child_status);
-
-    let nums = String::from("damn your fucking ashole");
-    let _ = thread::spawn( move || {
-        println!("{}", nums);
-    });
-}
-
-#[derive(Debug)]
-pub enum Chain {
-    Ethereum,
+    Result::Ok(())
 }
 
 #[derive(Debug)]
@@ -58,13 +81,9 @@ pub enum Event {
     LiquidityRemoved
 }
 
-pub fn check_sync_state() {
+pub fn check_sync_state() {}
 
-}
-
-pub async fn sync() {
-
-}
+pub async fn sync() {}
 
 pub fn subscribe(event: Event) {
     match event {
