@@ -1,15 +1,11 @@
-
-use diesel::prelude::{Insertable, Queryable, QueryResult};
-use diesel::pg::PgConnection;
-use diesel::{QueryDsl, RunQueryDsl};
-
-use super::schema::{pairs, protocols};
-use super::schema::pairs::dsl::pairs as get_paris;
-use super::schema::protocols::dsl::protocols as get_protocols;
+use diesel::prelude::*;
+use diesel::table;
+use crate::db::schema::pairs::dsl::{id as pair_id, *};
+use crate::db::schema::protocols::dsl::{id as protocol_id, name as protocol_name, *};
 
 #[derive(Insertable, Debug)]
 #[table_name="protocols"]
-pub struct Protocol {
+pub struct NewProtocol {
     pub name: String,
     pub official_url: Option<String>,
     pub network: String,
@@ -19,7 +15,19 @@ pub struct Protocol {
     pub factory_address: String,
 }
 
-impl Protocol {
+#[derive(Insertable, Debug)]
+#[table_name="pairs"]
+pub struct NewPair {
+    pub pair_address: String,
+    pub pair_index: i64,
+    pub token0: String,
+    pub token1: String,
+    pub reserve0: i64,
+    pub reserve1: i64,
+    pub factory: String
+}
+
+impl NewProtocol {
     /*
         let _protocol = create_protocol(
             &connection,
@@ -32,47 +40,26 @@ impl Protocol {
             "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
         );
      */
-    pub fn add_protocol(protocol: Protocol, conn: &PgConnection) -> QueryResult<usize> {
+    pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
 
         // let new_protocol = NewProtocol { name, official_url, network, description, symbol, router_address, factory_address };
         diesel::insert_into(protocols::table)
             .values(&protocol)
             .execute(conn)
     }
-
-    pub fn update_protocol(protocol: Protocol, conn: &PgConnection) -> QueryResult<usize> {
+    pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
         QueryResult::Ok(1)
     }
-
-    pub fn rm_protocol(id: i64, conn: &PgConnection) -> QueryResult<usize> {
-        diesel::delete(get_protocols.find(id)).execute(conn)
-    }
 }
 
-#[derive(Insertable, Debug)]
-#[table_name="pairs"]
-pub struct Pair {
-    pub pair_address: String,
-    pub pair_index: i64,
-    pub token0: String,
-    pub token1: String,
-    pub reserve0: i64,
-    pub reserve1: i64,
-    pub factory: String
-}
 
-impl Pair {
-    pub fn add_pair(pair: Pair, conn: &PgConnection) -> QueryResult<usize> {
+impl NewPair {
+    pub fn add_new_pair(pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
         diesel::insert_into(pairs::table)
             .values(&pair)
             .execute(conn)
     }
-
     pub fn update_pair(new_pair: Pair, conn: &PgConnection) -> QueryResult<usize> {
         QueryResult::Ok(1)
-    }
-
-    pub fn rm_pair(id: i64, conn: &PgConnection) -> QueryResult<usize> {
-        diesel::delete(get_paris.find(id)).execute(conn)
     }
 }
