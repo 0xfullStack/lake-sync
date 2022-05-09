@@ -26,28 +26,28 @@ impl Subscriber {
         }
     }
 
-    pub fn star_watch_events(&self) {
-        self.pair_created_event();
+    pub fn star_watching(&self) -> std::io::Result<()> {
+        // self.pair_created_event();
         self.pair_sync_event();
+        Result::Ok(())
     }
 
-    pub fn stop_watching() {}
+    pub fn stop_watching(&self) {}
 
-    async fn pair_created_event(&self) {
+    pub async fn pair_created_event(&self) {
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
         let provider = Provider::new(ws).interval(Duration::from_millis(500));
-        let client = Arc::new(provider);
 
-        let factory_contract = IUniSwapV2Factory::new(self.factory_address.clone(), Arc::clone(&client));
-        let address = Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7").unwrap();
+        let block_number = BlockNumber::Number(U64::from(10000835));
+        let filter = Filter::default()
+            .topic0(Value(event_topic))
+            .from_block(block_number);
 
-        // let filter = factory_contract.transfer_filter();
-        // let mut stream = filter.stream().await.unwrap();
-        //
-        // while let Some(block) = stream.next().await {
-        //     dbg!(block);
-        // }
+        let mut stream = provider.subscribe_logs(&filter).await.unwrap();
+        while let Some(log) = stream.next().await {
+            dbg!(log);
+        }
     }
 
     async fn pair_sync_event(&self) {
@@ -60,6 +60,17 @@ impl Subscriber {
             .topic0(Value(event_topic))
             .from_block(block_number);
 
-        let subscribe = provider.subscribe_logs(&filter).await;
+        let mut stream = provider.subscribe_logs(&filter).await.unwrap();
+        while let Some(log) = stream.next().await {
+            dbg!(log);
+        }
+    }
+
+    fn store_into_db(&self) {
+
+    }
+
+    fn filter_target_pairs_change() {
+
     }
 }

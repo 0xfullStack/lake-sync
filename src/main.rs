@@ -5,10 +5,8 @@ mod db;
 mod dex;
 mod abi;
 
-use std::thread;
-use std::thread::Builder;
-
-use std::env;
+use std::{env, thread};
+use diesel::query_dsl::InternalJoinDsl;
 use env_logger::Env;
 use dotenv::dotenv;
 use ethers::prelude::U256;
@@ -19,40 +17,12 @@ use db::postgres::*;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
 
-    // dotenv().ok();
-    // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    //
-    // let child = thread::spawn(|| {
-    //     println!("Thread");
-    //     "Much concurrent. such wow".to_string()
-    // });
-    //
-    // print!("Hello ");
-    //
-    // let value = child.join().expect("Failed joining child thread");
-    //
-    // println!("{}", value);
-    //
-    //
-    // let my_thread = Builder::new().name("Worker Thred".to_string()).stack_size(1024 * 4);
-    // let handle = my_thread.spawn(|| {
-    //     panic!("Oops");
-    // });
-    //
-    // let child_status = handle.unwrap().join();
-    // // println!("Child status: {}", child_status);
-    //
-    // let nums = String::from("damn your fucking ashole");
-    // let _ = thread::spawn( move || {
-    //     println!("{}", nums);
-    // });
-
-    env_logger::init();
     dotenv().ok();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     // DB pool
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = init_pool(&database_url).expect("Failed to create pool");
+    // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    // let pool = init_pool(&database_url).expect("Failed to create pool");
 
     let node_http = env::var("INFURA_NODE_HTTP").unwrap().as_str();
     let assembler = Assembler::make(
@@ -70,7 +40,7 @@ async fn main() -> std::io::Result<()> {
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
     );
 
-    Result::Ok(())
+    subscriber.star_watching().await
 }
 
 #[derive(Debug)]

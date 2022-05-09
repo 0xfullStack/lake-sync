@@ -61,4 +61,8 @@ impl Assembler {
             }
         )
     }
+
+    pub fn response_to_reserves_changing(address: Address) {
+
+    }
 }
