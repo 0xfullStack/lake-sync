@@ -3,6 +3,7 @@ extern crate diesel;
 
 mod db;
 mod dex;
+mod abi;
 
 use std::thread;
 use std::thread::Builder;
@@ -11,9 +12,9 @@ use std::env;
 use env_logger;
 use env_logger::Env;
 use dotenv::dotenv;
-use web3::types::U256;
-use dex::assembler;
-use crate::assembler::Assembler;
+use ethers::prelude::U256;
+use dex::assembler::Assembler;
+use dex::subscriber::Subscriber;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -47,9 +48,9 @@ async fn main() -> std::io::Result<()> {
     // });
 
     env_logger::init();
-    dotenv::dotenv().ok();
+    dotenv().ok();
 
-    // let node_url = env::var("INFURA_MAINNET").unwrap().as_str();
+    let node_http = env::var("INFURA_NODE_HTTP").unwrap().as_str();
     let assembler = Assembler::make(
         String::from("https://mainnet.infura.io/v3/c60b0bb42f8a4c6481ecd229eddaca27"),
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
@@ -58,6 +59,12 @@ async fn main() -> std::io::Result<()> {
     let address = assembler.fetch_pair_address(U256::from(1)).await.unwrap();
     let result = assembler.fetch_pair_info(address, U256::from(1)).await.unwrap();
     println!("{:?}", result);
+
+    let node_wss = env::var("INFURA_NODE_WS").unwrap().as_str();
+    let subscriber = Subscriber::make(
+        String::from("wss://mainnet.infura.io/ws/v3/9aa3d95b3bc440fa88ea12eaa4456161"),
+        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
+    );
 
     Result::Ok(())
 }
@@ -77,12 +84,10 @@ pub enum State {
 #[derive(Debug)]
 pub enum Event {
     PairCreated,
-    LiquidityAdded,
-    LiquidityRemoved
+    Sync
 }
 
-pub fn check_sync_state() {}
-
+pub async fn check_sync_state() {}
 pub async fn sync() {}
 
 pub fn subscribe(event: Event) {
@@ -90,11 +95,8 @@ pub fn subscribe(event: Event) {
         Event::PairCreated => {
 
         }
-        Event::LiquidityAdded => {
-            println!("LiquidityAdded")
-        }
-        Event::LiquidityRemoved => {
-            println!("LiquidityRemoved")
+        Event::Sync => {
+            println!("Sync")
         }
     }
 }
