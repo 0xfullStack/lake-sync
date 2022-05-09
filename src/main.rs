@@ -9,12 +9,12 @@ use std::thread;
 use std::thread::Builder;
 
 use std::env;
-use env_logger;
 use env_logger::Env;
 use dotenv::dotenv;
 use ethers::prelude::U256;
 use dex::assembler::Assembler;
 use dex::subscriber::Subscriber;
+use db::postgres::*;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -49,6 +49,10 @@ async fn main() -> std::io::Result<()> {
 
     env_logger::init();
     dotenv().ok();
+
+    // DB pool
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = init_pool(&database_url).expect("Failed to create pool");
 
     let node_http = env::var("INFURA_NODE_HTTP").unwrap().as_str();
     let assembler = Assembler::make(
