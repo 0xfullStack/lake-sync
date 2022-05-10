@@ -23,9 +23,9 @@ async fn main() -> std::io::Result<()> {
     // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     // let pool = init_pool(&database_url).expect("Failed to create pool");
 
-    let node_http = env::var("INFURA_NODE_HTTP").unwrap().as_str();
+    let node_http = &env::var("INFURA_NODE_HTTP").unwrap();
     let assembler = Assembler::make(
-        String::from("https://mainnet.infura.io/v3/c60b0bb42f8a4c6481ecd229eddaca27"),
+        node_http.to_string(),
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
     );
 
@@ -33,13 +33,13 @@ async fn main() -> std::io::Result<()> {
     let result = assembler.fetch_pair_info(address, U256::from(1)).await.unwrap();
     println!("{:?}", result);
 
-    let node_wss = env::var("INFURA_NODE_WS").unwrap().as_str();
+    let node_wss = &env::var("INFURA_NODE_WS").unwrap();
     let subscriber = Subscriber::make(
-        String::from("wss://mainnet.infura.io/ws/v3/9aa3d95b3bc440fa88ea12eaa4456161"),
+        node_wss.to_string(),
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
     );
 
-    subscriber.star_watching().await
+    subscriber.watching_with_guardian().await.map(|_| ())
 }
 
 #[derive(Debug)]
