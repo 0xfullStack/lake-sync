@@ -1,9 +1,8 @@
 use std::env;
-use dotenv::dotenv;
 use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Duration;
-use ethers::abi::Error;
+use dotenv::dotenv;
 use super::models::{NewPair, NewProtocol};
 
 use tokio;
@@ -13,6 +12,7 @@ use ethers::prelude::ValueOrArray::Value;
 use ethers::types::{U64, Address};
 use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
 
+#[derive(Debug, Clone)]
 pub struct Subscriber {
     pub node_url: String,
     pub factory_address: Address
@@ -32,26 +32,28 @@ impl Subscriber {
         }
     }
 
-    pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
+    pub async fn watching_with_guardian(self: Arc<Self>) -> std::io::Result<bool> {
 
-        let mut pair_created_guardian: bool = true;
-        while pair_created_guardian {
-            let result = self.pair_created_event().await.unwrap();
-            if !result {
-                continue;
-            }
-        };
-        let mut pair_sync_guardian: bool = true;
-        while pair_sync_guardian {
-            let result = self.pair_sync_event().await.unwrap();
-            if !result {
-                continue;
-            }
-        };
+        loop {
+            tokio::spawn(async move {
+                let target = self.clone();
+                target.pair_created_event();
+            }).await;
+            println!("111");
+        }
+
+        loop {
+            tokio::spawn(async move {
+                let target = self.clone();
+                target.pair_sync_event();
+            }).await;
+            println!("111");
+        }
+
         Result::Ok(true)
     }
 
-    pub async fn pair_created_event(&self) -> std::io::Result<bool> {
+    pub async fn pair_created_event(&self) {
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
 
@@ -76,7 +78,7 @@ impl Subscriber {
                 }
             }
         }
-        Result::Ok(false)
+        // Result::Ok(false)
     }
 
     async fn pair_sync_event(&self) -> std::io::Result<bool> {
@@ -106,10 +108,10 @@ impl Subscriber {
     }
 
     fn store_into_db(&self) {
-
+        unimplemented!()
     }
 
     fn filter_target_pairs_change() {
-
+        unimplemented!()
     }
 }

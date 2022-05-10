@@ -6,6 +6,7 @@ mod dex;
 mod abi;
 
 use std::{env, thread};
+use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
 use ethers::prelude::U256;
@@ -40,6 +41,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     subscriber.watching_with_guardian().await.map(|_| ())
+    // Arc::new(subscriber).watching_with_guardian().await.map(|_| ())
 }
 
 #[derive(Debug)]
