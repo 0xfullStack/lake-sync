@@ -40,7 +40,7 @@ async fn main() -> std::io::Result<()> {
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
     );
 
-    Arc::new(subscriber).watching_with_guardian().await.map(|_| ())
+    subscriber.watching_with_guardian().await.map(|_| ())
 }
 
 #[derive(Debug)]

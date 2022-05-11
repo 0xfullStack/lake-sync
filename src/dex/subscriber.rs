@@ -33,7 +33,7 @@ impl Subscriber {
         }
     }
 
-    pub async fn watching_with_guardian(self: Arc<Self>) -> std::io::Result<bool> {
+    pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
 
         let thread_self = (self.clone(), self.clone());
         let pair_created_thread = tokio::spawn(async move {
