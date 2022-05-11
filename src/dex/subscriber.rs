@@ -1,4 +1,5 @@
 use std::env;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Duration;
@@ -104,6 +105,10 @@ impl Subscriber {
             }
         }
         Result::Ok(false)
+    }
+
+    pub fn response_to_reserves_changing(address: Address) {
+
     }
 
     fn store_into_db(&self) {

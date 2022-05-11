@@ -6,6 +6,7 @@ mod dex;
 mod abi;
 
 use std::{env, thread};
+use std::rc::Rc;
 use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
@@ -21,18 +22,18 @@ async fn main() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     // DB pool
-    // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    // let pool = init_pool(&database_url).expect("Failed to create pool");
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let pool = init_pool(&database_url).expect("Failed to create pool");
+    let rc_pool = Rc::new(pool);
 
     let node_http = &env::var("INFURA_NODE_HTTP").unwrap();
     let assembler = Assembler::make(
         node_http.to_string(),
-        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
+        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
+        Rc::clone(&rc_pool)
     );
 
-    let address = assembler.fetch_pair_address(U256::from(1)).await.unwrap();
-    let result = assembler.fetch_pair_info(address, U256::from(1)).await.unwrap();
-    println!("{:?}", result);
+    assembler.polling().await;
 
     let node_wss = &env::var("INFURA_NODE_WS").unwrap();
     let subscriber = Subscriber::make(

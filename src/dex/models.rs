@@ -27,8 +27,7 @@ pub struct NewPair {
     pub factory: String
 }
 
-impl NewProtocol {
-    /*
+/*
         let _protocol = create_protocol(
             &connection,
             "Uniswap Protocol",
@@ -40,27 +39,21 @@ impl NewProtocol {
             "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
         );
      */
-    pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
-
-        // let new_protocol = NewProtocol { name, official_url, network, description, symbol, router_address, factory_address };
-        diesel::insert_into(protocols::table)
-            .values(&protocol)
-            .execute(conn)
-    }
-
-    pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
-        QueryResult::Ok(1)
-    }
+pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
+    diesel::insert_into(protocols::table)
+        .values(&protocol)
+        .execute(conn)
 }
 
+pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
+    QueryResult::Ok(1)
+}
 
-impl NewPair {
-    pub fn add_new_pair(pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
-        diesel::insert_into(pairs::table)
-            .values(&pair)
-            .execute(conn)
-    }
-    pub fn update_pair(new_pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
-        QueryResult::Ok(1)
-    }
+pub fn add_new_pair(pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
+    diesel::insert_into(pairs::table)
+        .values(&pair)
+        .execute(conn)
+}
+pub fn update_pair(new_pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
+    QueryResult::Ok(1)
 }
