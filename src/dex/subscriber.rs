@@ -2,6 +2,7 @@ use std::env;
 use std::sync::Arc;
 use std::str::FromStr;
 use std::time::Duration;
+use diesel::query_dsl::InternalJoinDsl;
 use dotenv::dotenv;
 use super::models::{NewPair, NewProtocol};
 
@@ -34,26 +35,24 @@ impl Subscriber {
 
     pub async fn watching_with_guardian(self: Arc<Self>) -> std::io::Result<bool> {
 
-        loop {
-            tokio::spawn(async move {
-                let target = self.clone();
-                target.pair_created_event();
-            }).await;
-            println!("111");
-        }
+        let thread_self = (self.clone(), self.clone());
+        let pair_created_thread = tokio::spawn(async move {
+            loop {
+                thread_self.0.pair_created_event().await;
+            }
+        });
 
-        loop {
-            tokio::spawn(async move {
-                let target = self.clone();
-                target.pair_sync_event();
-            }).await;
-            println!("111");
-        }
+        let pair_sync_thread = tokio::spawn(async move {
+            loop {
+                thread_self.1.pair_sync_event().await;
+            }
+        });
 
+        tokio::join!(pair_created_thread, pair_sync_thread);
         Result::Ok(true)
     }
 
-    pub async fn pair_created_event(&self) {
+    pub async fn pair_created_event(&self) -> std::io::Result<bool> {
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
 
@@ -78,7 +77,7 @@ impl Subscriber {
                 }
             }
         }
-        // Result::Ok(false)
+        Result::Ok(false)
     }
 
     async fn pair_sync_event(&self) -> std::io::Result<bool> {
