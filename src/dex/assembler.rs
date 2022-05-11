@@ -32,7 +32,7 @@ impl Assembler {
             node_url: node.clone(),
             factory_address: Address::from_str(factory.as_str()).unwrap(),
             client: Arc::new(Provider::<Http>::try_from(node.clone()).unwrap()),
-            pool: pool
+            pool
         }
     }
 
@@ -48,12 +48,11 @@ impl Assembler {
         //     description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
         //     symbol: Some("uniswap-v2".to_string()),
         //     router_address: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
-        //     factory_address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string()
+        //     factory_address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_uppercase()
         // };
         //
         // let conn = &self.pool.get().unwrap();
         // models::add_new_protocol(_protocol, conn);
-
         for index in 0..length {
             let address = self.fetch_pair_address(index).await.unwrap();
             let new_pair = self.fetch_pair_info(address, index).await.unwrap();
@@ -93,10 +92,15 @@ impl Assembler {
         let token0: Address = pair_contract.token_0().call().await.unwrap();
         let token1: Address = pair_contract.token_1().call().await.unwrap();
 
-        let pair_address_format = format!("{}", serde_json::to_string(&address).unwrap());
-        let token0_format = format!("{}", serde_json::to_string(&token0).unwrap());
-        let token1_format = format!("{}", serde_json::to_string(&token1).unwrap());
-        let factory_address_format = format!("{}", serde_json::to_string(&self.factory_address).unwrap());
+        let mut pair_address_format = serde_json::to_string(&address).unwrap();
+        let mut token0_format = serde_json::to_string(&token0).unwrap();
+        let mut token1_format = serde_json::to_string(&token1).unwrap();
+        let mut factory_address_format = serde_json::to_string(&self.factory_address).unwrap();
+
+        pair_address_format.retain(|c| c != '\"');
+        token0_format.retain(|c| c != '\"');
+        token1_format.retain(|c| c != '\"');
+        factory_address_format.retain(|c| c != '\"');
 
         // token0.to
         let (reserve0_, reserve1_, _) = pair_contract.get_reserves().call().await.unwrap();
