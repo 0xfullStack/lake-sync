@@ -115,8 +115,8 @@ impl Assembler {
                 pair_index: index,
                 token0: token0_format,
                 token1: token1_format,
-                reserve0: reserve0_ as i64,
-                reserve1: reserve1_ as i64,
+                reserve0: reserve0_.to_string(),
+                reserve1: reserve1_.to_string(),
                 factory: factory_address_format
             }
         )

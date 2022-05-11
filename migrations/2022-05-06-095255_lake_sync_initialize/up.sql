@@ -6,8 +6,8 @@ CREATE TABLE "pairs" (
                          "pair_index" bigint NOT NULL,
                          "token0" char(42) NOT NULL,
                          "token1" char(42) NOT NULL,
-                         "reserve0" bigint NOT NULL,
-                         "reserve1" bigint NOT NULL,
+                         "reserve0" text NOT NULL,
+                         "reserve1" text NOT NULL,
                          "factory" char(42) NOT NULL,
                          PRIMARY KEY ("id"),
                          CONSTRAINT "pair_id" UNIQUE ("id")

@@ -5,8 +5,8 @@ table! {
         pair_index -> Int8,
         token0 -> Bpchar,
         token1 -> Bpchar,
-        reserve0 -> Int8,
-        reserve1 -> Int8,
+        reserve0 -> Text,
+        reserve1 -> Text,
         factory -> Bpchar,
     }
 }

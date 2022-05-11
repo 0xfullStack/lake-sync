@@ -22,8 +22,8 @@ pub struct NewPair {
     pub pair_index: i64,
     pub token0: String,
     pub token1: String,
-    pub reserve0: i64,
-    pub reserve1: i64,
+    pub reserve0: String,
+    pub reserve1: String,
     pub factory: String
 }
 
