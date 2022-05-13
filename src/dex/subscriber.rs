@@ -37,19 +37,14 @@ impl Subscriber {
         }
     }
 
-    async fn start_syncing() {
+    pub async fn start_syncing(&self) {
 
-
-    }
-
-    pub async fn split_into_block_range(&self) {
-        let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
         let provider = Provider::new(ws);
 
         let blocks_per_loop = U64::from(100);
         let start_block_number: U64 = U64::from(1);
-        let latest_block_number: U64 = U64::from(105);
+        let latest_block_number: U64 = U64::from(95);
         // let latest_block_number: U64 = provider.get_block_number().await.unwrap();
 
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
@@ -79,23 +74,14 @@ impl Subscriber {
 
             println!("{}", start_block_per_loop.to_string());
             println!("{}", end_block_per_loop.to_string());
-            //
-            // let filter = Filter::default()
-            //     .address(ValueOrArray::Value(self.factory_address))
-            //     .topic0(Value(event_topic))
-            //     .from_block(BlockNumber::Number(start_block_per_loop))
-            //     .to_block(BlockNumber::Number(end_block_per_loop));
-            //
-            // let logs = provider.get_logs(&filter).await.unwrap();
-            //
-            // for (idx, log) in logs.iter() {
-            //     let data = &log.data.to_vec();
-            //     let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap();
-            //
-            //     let token0 = Address::from(log.topics[1]).to_string();
-            //     let token1 = Address::from(log.topics[2]).to_string();
-            //     let pair_address = parameters[0].to_string();
-            // }
+
+            let pairs = self.syncing_range_blocks(
+                BlockNumber::Number(start_block_per_loop),
+                BlockNumber::Number(end_block_per_loop),
+                &provider
+            ).await;
+
+            // db handling......
 
             // last loop flag
             if meet_last_loop {
@@ -108,9 +94,45 @@ impl Subscriber {
         }
     }
 
+    async fn syncing_range_blocks(&self, from: BlockNumber, to: BlockNumber, provider: &Provider<Ws>) -> Vec<NewPair> {
+        let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
+        let filter = Filter::default()
+            .address(ValueOrArray::Value(self.factory_address))
+            .topic0(Value(event_topic))
+            .from_block(from)
+            .to_block(to);
+
+        let logs = provider.get_logs(&filter).await.unwrap();
+        let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
+        for log in logs {
+            let data = &log.data.to_vec();
+            let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap();
+
+            let token0 = Address::from(log.topics[1]).to_string();
+            let token1 = Address::from(log.topics[2]).to_string();
+            let pair_address = parameters[0].to_string();
+
+            let pair = NewPair {
+                pair_address,
+                pair_index: 0,
+                token0,
+                token1,
+                reserve0: "".to_string(),
+                reserve1: "".to_string(),
+                factory: self.factory_address.to_string()
+            };
+            pairs.push(pair);
+        }
+        pairs
+    }
+
     async fn patch_pair_sync_events() {
 
     }
+
+
+
+
 
     pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
 

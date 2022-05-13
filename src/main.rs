@@ -46,7 +46,7 @@ async fn main() -> std::io::Result<()> {
     let to = BlockNumber::Number(U64::from(14796225));
     // subscriber.sync_from_block_range(from, to).await;
     // subscriber.watching_with_guardian().await.map(|_| ())
-    subscriber.split_into_block_range().await;
+    subscriber.start_syncing().await;
 
     Result::Ok(())
 }
