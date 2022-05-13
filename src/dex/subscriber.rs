@@ -1,4 +1,5 @@
 use std::env;
+use std::ops::{Add, Sub, SubAssign};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::str::FromStr;
@@ -36,50 +37,79 @@ impl Subscriber {
         }
     }
 
-    pub async fn sync_from_block_range(&self, from: BlockNumber, to: BlockNumber) {
+    async fn start_syncing() {
+
+
+    }
+
+    pub async fn split_into_block_range(&self) {
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
-
         let provider = Provider::new(ws);
 
-        let filter = Filter::default()
-            .topic0(Value(event_topic))
-            .from_block(BlockNumber::Number(U64::from(14767384 )));
-            // .to_block(BlockNumber::Number(U64::from( 14767319)))
-            // .address(ValueOrArray::Value(self.factory_address))
+        let blocks_per_loop = U64::from(100);
+        let start_block_number: U64 = U64::from(1);
+        let latest_block_number: U64 = U64::from(105);
+        // let latest_block_number: U64 = provider.get_block_number().await.unwrap();
 
+        let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
+        let mut blocks_remain = initialize_blocks_remain;
 
+        let mut meet_last_loop = false;
+        while blocks_remain > U64::zero() {
 
-        let logs = provider.get_logs(&filter).await.unwrap();
+            println!("start");
 
+            let mut start_block_per_loop;
+            let mut end_block_per_loop;
 
-        for log in logs {
-            let data = &log.data.to_vec();
+            if initialize_blocks_remain <= blocks_per_loop {
+                start_block_per_loop = start_block_number;
+                end_block_per_loop = latest_block_number;
+                meet_last_loop = true;
+            } else {
+                // Calculate start end block
+                start_block_per_loop = start_block_number.add(initialize_blocks_remain.sub(blocks_remain));
+                if meet_last_loop {
+                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_remain);
+                } else {
+                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_per_loop);
+                }
+            }
 
+            println!("{}", start_block_per_loop.to_string());
+            println!("{}", end_block_per_loop.to_string());
+            //
+            // let filter = Filter::default()
+            //     .address(ValueOrArray::Value(self.factory_address))
+            //     .topic0(Value(event_topic))
+            //     .from_block(BlockNumber::Number(start_block_per_loop))
+            //     .to_block(BlockNumber::Number(end_block_per_loop));
+            //
+            // let logs = provider.get_logs(&filter).await.unwrap();
+            //
+            // for (idx, log) in logs.iter() {
+            //     let data = &log.data.to_vec();
+            //     let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap();
+            //
+            //     let token0 = Address::from(log.topics[1]).to_string();
+            //     let token1 = Address::from(log.topics[2]).to_string();
+            //     let pair_address = parameters[0].to_string();
+            // }
 
-            let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data);
-            // let object = serde_derive::Deserialize(data.into_token());
-
-
-
-            println!("{:?}", Address::from(log.topics[1]));
-            println!("{:?}", Address::from(log.topics[2]));
-            println!("{:?}", parameters.unwrap());
+            // last loop flag
+            if meet_last_loop {
+                break;
+            }
+            if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
+                meet_last_loop = true;
+            }
+            blocks_remain.sub_assign(blocks_per_loop);
         }
+    }
 
-        // while let next = stream.next().await {
-        //     match next {
-        //         Some(log) => {
-        //             dbg!(log);
-        //         },
-        //         None => {
-        //             println!("pari created error occur");
-        //             stream.unsubscribe().await;
-        //             break;
-        //         }
-        //     }
-        // }
-        // Result::Ok(false)
+    async fn patch_pair_sync_events() {
+
     }
 
     pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
