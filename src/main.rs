@@ -39,13 +39,10 @@ async fn main() -> std::io::Result<()> {
     let node_wss = &env::var("INFURA_NODE_WS").unwrap();
     let subscriber = Subscriber::make(
         node_wss.to_string(),
-        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
+        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
+        Rc::clone(&rc_pool)
     );
 
-    let from = BlockNumber::Number(U64::from(14756225));
-    let to = BlockNumber::Number(U64::from(14796225));
-    // subscriber.sync_from_block_range(from, to).await;
-    // subscriber.watching_with_guardian().await.map(|_| ())
     subscriber.start_syncing().await;
 
     Result::Ok(())

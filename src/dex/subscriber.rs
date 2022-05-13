@@ -16,11 +16,14 @@ use ethers::prelude::FilterBlockOption::AtBlockHash;
 use ethers::prelude::ValueOrArray::Value;
 use ethers::types::{U64, Address};
 use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
+use crate::db::postgres::PgPool;
+use crate::dex::models;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Subscriber {
     pub node_url: String,
-    pub factory_address: Address
+    pub factory_address: Address,
+    pool: Rc<PgPool>
 }
 
 enum SubscriptionError {
@@ -30,22 +33,24 @@ enum SubscriptionError {
 }
 
 impl Subscriber {
-    pub fn make(node: String, factory: String) -> Subscriber {
+    pub fn make(node: String, factory: String, pool: Rc<PgPool>) -> Subscriber {
         Subscriber {
             node_url: node.clone(),
             factory_address: Address::from_str(factory.as_str()).unwrap(),
+            pool
         }
     }
 
     pub async fn start_syncing(&self) {
-
+        let conn = &self.pool.get().unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
         let provider = Provider::new(ws);
 
-        let blocks_per_loop = U64::from(100);
-        let start_block_number: U64 = U64::from(1);
-        let latest_block_number: U64 = U64::from(95);
-        // let latest_block_number: U64 = provider.get_block_number().await.unwrap();
+        let blocks_per_loop = U64::from(10000);
+        // let start_block_number: U64 = U64::from(10008355);
+        // let latest_block_number: U64 = U64::from(10042267);
+        let start_block_number: U64 = U64::from(10000835);
+        let latest_block_number: U64 = provider.get_block_number().await.unwrap();
 
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
         let mut blocks_remain = initialize_blocks_remain;
@@ -80,6 +85,18 @@ impl Subscriber {
                 BlockNumber::Number(end_block_per_loop),
                 &provider
             ).await;
+
+            for pair in pairs {
+                match models::add_new_pair(pair, conn) {
+                    Ok(_) => {
+                        // println!("Success: {:?}", pair);
+                    }
+                    Err(e) => {
+                        println!("{}", e);
+                        break;
+                    }
+                }
+            }
 
             // db handling......
 
@@ -134,24 +151,24 @@ impl Subscriber {
 
 
 
-    pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
-
-        let thread_self = (self.clone(), self.clone());
-        let pair_created_thread = tokio::spawn(async move {
-            loop {
-                thread_self.0.pair_created_event().await;
-            }
-        });
-
-        let pair_sync_thread = tokio::spawn(async move {
-            // loop {
-            //     thread_self.1.pair_sync_event().await;
-            // }
-        });
-
-        tokio::join!(pair_created_thread, pair_sync_thread);
-        Result::Ok(true)
-    }
+    // pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
+    //
+    //     let thread_self = (self.clone(), self.clone());
+    //     let pair_created_thread = tokio::spawn(async move {
+    //         loop {
+    //             thread_self.0.pair_created_event().await;
+    //         }
+    //     });
+    //
+    //     let pair_sync_thread = tokio::spawn(async move {
+    //         // loop {
+    //         //     thread_self.1.pair_sync_event().await;
+    //         // }
+    //     });
+    //
+    //     tokio::join!(pair_created_thread, pair_sync_thread);
+    //     Result::Ok(true)
+    // }
 
     pub async fn pair_created_event(&self) -> std::io::Result<bool> {
         println!("pari created subscribe begin");
