@@ -5,11 +5,13 @@ use std::str::FromStr;
 use std::time::Duration;
 use diesel::query_dsl::InternalJoinDsl;
 use dotenv::dotenv;
+use ethers::abi::{ParamType, Tokenizable, Tokenize};
 use super::models::{NewPair, NewProtocol};
 
 use tokio;
 use ethers::prelude::*;
 use ethers::contract::Contract;
+use ethers::prelude::FilterBlockOption::AtBlockHash;
 use ethers::prelude::ValueOrArray::Value;
 use ethers::types::{U64, Address};
 use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
@@ -34,6 +36,52 @@ impl Subscriber {
         }
     }
 
+    pub async fn sync_from_block_range(&self, from: BlockNumber, to: BlockNumber) {
+        let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
+        let ws = Ws::connect(self.node_url.clone()).await.unwrap();
+
+        let provider = Provider::new(ws);
+
+        let filter = Filter::default()
+            .topic0(Value(event_topic))
+            .from_block(BlockNumber::Number(U64::from(14767384 )));
+            // .to_block(BlockNumber::Number(U64::from( 14767319)))
+            // .address(ValueOrArray::Value(self.factory_address))
+
+
+
+        let logs = provider.get_logs(&filter).await.unwrap();
+
+
+        for log in logs {
+            let data = &log.data.to_vec();
+
+
+            let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data);
+            // let object = serde_derive::Deserialize(data.into_token());
+
+
+
+            println!("{:?}", Address::from(log.topics[1]));
+            println!("{:?}", Address::from(log.topics[2]));
+            println!("{:?}", parameters.unwrap());
+        }
+
+        // while let next = stream.next().await {
+        //     match next {
+        //         Some(log) => {
+        //             dbg!(log);
+        //         },
+        //         None => {
+        //             println!("pari created error occur");
+        //             stream.unsubscribe().await;
+        //             break;
+        //         }
+        //     }
+        // }
+        // Result::Ok(false)
+    }
+
     pub async fn watching_with_guardian(&self) -> std::io::Result<bool> {
 
         let thread_self = (self.clone(), self.clone());
@@ -44,9 +92,9 @@ impl Subscriber {
         });
 
         let pair_sync_thread = tokio::spawn(async move {
-            loop {
-                thread_self.1.pair_sync_event().await;
-            }
+            // loop {
+            //     thread_self.1.pair_sync_event().await;
+            // }
         });
 
         tokio::join!(pair_created_thread, pair_sync_thread);
@@ -54,15 +102,22 @@ impl Subscriber {
     }
 
     pub async fn pair_created_event(&self) -> std::io::Result<bool> {
+        println!("pari created subscribe begin");
+
         let event_topic = TxHash::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap();
         let ws = Ws::connect(self.node_url.clone()).await.unwrap();
 
-        let provider = Provider::new(ws).interval(Duration::from_secs(3600000000u64));
+        let provider = Provider::new(ws);
 
-        let block_number = BlockNumber::Number(U64::from(10000835));
+        let block_number = BlockNumber::Number(U64::from(10850000));
         let filter = Filter::default()
-            .topic0(Value(event_topic))
-            .from_block(block_number);
+            .from_block(block_number)
+            .to_block(BlockNumber::Latest)
+            .address(ValueOrArray::Value(self.factory_address))
+            .topic0(Value(event_topic));
+
+
+
 
         let mut stream = provider.subscribe_logs(&filter).await.unwrap();
 
@@ -88,8 +143,9 @@ impl Subscriber {
 
         let block_number = BlockNumber::Number(U64::from(10000835));
         let filter = Filter::default()
-            .topic0(Value(event_topic))
-            .from_block(block_number);
+            .from_block(block_number)
+            .topic0(Value(event_topic));
+
 
         let mut stream = provider.subscribe_logs(&filter).await.unwrap();
         while let next = stream.next().await {

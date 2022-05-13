@@ -10,10 +10,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
-use ethers::prelude::U256;
+use ethers::prelude::{BlockNumber, U256};
 use dex::assembler::Assembler;
 use dex::subscriber::Subscriber;
 use db::postgres::*;
+use ethers::prelude::U64;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -33,7 +34,7 @@ async fn main() -> std::io::Result<()> {
         Rc::clone(&rc_pool)
     );
 
-    assembler.polling().await;
+    // assembler.polling().await;
 
     let node_wss = &env::var("INFURA_NODE_WS").unwrap();
     let subscriber = Subscriber::make(
@@ -41,7 +42,12 @@ async fn main() -> std::io::Result<()> {
         String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f")
     );
 
-    subscriber.watching_with_guardian().await.map(|_| ())
+    let from = BlockNumber::Number(U64::from(14756225));
+    let to = BlockNumber::Number(U64::from(14796225));
+    subscriber.sync_from_block_range(from, to).await;
+    // subscriber.watching_with_guardian().await.map(|_| ())
+
+    Result::Ok(())
 }
 
 #[derive(Debug)]
