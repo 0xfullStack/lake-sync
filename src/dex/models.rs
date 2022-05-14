@@ -1,7 +1,9 @@
+use std::ops::AddAssign;
 use diesel::prelude::*;
 use diesel::{Insertable};
 use diesel::table;
 use crate::db::schema::{protocols, pairs};
+use crate::db::schema::pairs::{pair_address, reserve0, reserve1};
 
 #[derive(Insertable, Debug)]
 #[table_name="protocols"]
@@ -49,11 +51,39 @@ pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResul
     QueryResult::Ok(1)
 }
 
-pub fn add_new_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResult<usize> {
+pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResult<usize> {
     diesel::insert_into(pairs::table)
         .values(&pairs)
         .execute(conn)
 }
-pub fn update_pair(new_pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
-    QueryResult::Ok(1)
+
+
+#[derive(AsChangeset, Debug)]
+#[table_name="pairs"]
+pub struct NewReserve {
+    pub reserve0: String,
+    pub reserve1: String,
+}
+
+pub fn batch_update_reserves(reserves: Vec<(String, NewReserve)>, conn: &PgConnection) -> QueryResult<usize> {
+    let mut execute_success_count = 0;
+    for element in reserves {
+        println!("Update reserve error, pair_address: {:?}, reserve: {:?}", element.0, element.1);
+        match update_reserve(element.0, element.1, conn) {
+            Ok(_) => {
+                execute_success_count.add_assign(1);
+            }
+            Err(e) => {
+                println!("Update reserve error: {:?}", e);
+            }
+        }
+    }
+    Ok(execute_success_count)
+}
+
+pub fn update_reserve(pair_address_: String, reserve: NewReserve, conn: &PgConnection) -> QueryResult<usize> {
+    diesel::update(pairs::table)
+        .filter( pair_address.eq(pair_address_))
+        .set(&reserve)
+        .execute(conn)
 }

@@ -11,6 +11,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
+use ethers::abi::Address;
 use ethers::prelude::{BlockNumber, U256};
 use ethers::prelude::builders::Event;
 use dex::assembler::Assembler;
@@ -79,6 +80,20 @@ impl Protocol {
             }
         }
     }
+
+    fn star_block_number(&self) -> U64 {
+        match self {
+            Protocol::SushiSwap => {
+                U64::from(10000835)
+            },
+            Protocol::UNISwapV2 => {
+                U64::from(10000835)
+            }
+            Protocol::UNISwapV3 => {
+                U64::from(10000835)
+            }
+        }
+    }
 }
 
 impl EventType {
@@ -92,5 +107,18 @@ impl EventType {
             }
         }
     }
+
+    fn blocks_per_loop(&self) -> U64 {
+        match self {
+            EventType::PairCreated => {
+                U64::from(100_000)
+            }
+            EventType::Sync => {
+                U64::from(1_000)
+            }
+        }
+    }
+
+
 }
 

@@ -36,6 +36,7 @@ impl Aggregator {
 
     pub async fn start_syncing(&self) {
         self.assembler.polling().await;
-        self.subscriber.listening().await;
+        // self.assembler.polling_sync().await;
+        // self.subscriber.listening().await;
     }
 }
