@@ -7,75 +7,90 @@ mod abi;
 
 use std::{env, thread};
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
 use ethers::prelude::{BlockNumber, U256};
+use ethers::prelude::builders::Event;
 use dex::assembler::Assembler;
 use dex::subscriber::Subscriber;
 use db::postgres::*;
 use ethers::prelude::U64;
+use ethers::types::{ H256, H160 };
+use crate::dex::aggregator::Aggregator;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
 
+    // Environment
     dotenv().ok();
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     // DB pool
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = init_pool(&database_url).expect("Failed to create pool");
-    let rc_pool = Rc::new(pool);
 
-    let node_http = &env::var("INFURA_NODE_HTTP").unwrap();
-    let assembler = Assembler::make(
-        node_http.to_string(),
-        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
-        Rc::clone(&rc_pool)
+    // Node
+    let http = (&env::var("INFURA_NODE_HTTP").unwrap()).to_string();
+    let ws   = (&env::var("INFURA_NODE_WS").unwrap()).to_string();
+
+    // Start Service
+    let aggregator = Aggregator::make(
+        Node { http, ws },
+        Rc::clone(&Rc::new(pool)),
+        Protocol::UNISwapV2
     );
 
-    // assembler.polling().await;
-
-    let node_wss = &env::var("INFURA_NODE_WS").unwrap();
-    let subscriber = Subscriber::make(
-        node_wss.to_string(),
-        String::from("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"),
-        Rc::clone(&rc_pool)
-    );
-
-    subscriber.start_syncing().await;
-
+    // Infinite Loop
+    aggregator.start_syncing().await;
     Result::Ok(())
+}
+
+pub struct Node {
+    pub http: String,
+    pub ws: String
 }
 
 #[derive(Debug)]
 pub enum Protocol {
     UNISwapV2,
+    UNISwapV3,
+    SushiSwap
 }
 
 #[derive(Debug)]
-pub enum State {
-    Monitoring,
-    Syncing,
-    Stop
-}
-
-#[derive(Debug)]
-pub enum Event {
+pub enum EventType {
     PairCreated,
     Sync
 }
 
-pub async fn check_sync_state() {}
-pub async fn sync() {}
-
-pub fn subscribe(event: Event) {
-    match event {
-        Event::PairCreated => {
-
-        }
-        Event::Sync => {
-            println!("Sync")
+impl Protocol {
+    fn factory_address(&self) -> H160 {
+        match self {
+            Protocol::SushiSwap => {
+                H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
+            },
+            Protocol::UNISwapV2 => {
+                H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
+            }
+            Protocol::UNISwapV3 => {
+                H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
+            }
         }
     }
 }
+
+impl EventType {
+    fn topic_hash(&self) -> H256 {
+        match self {
+            EventType::PairCreated => {
+                H256::from_str("0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9").unwrap()
+            }
+            EventType::Sync => {
+                H256::from_str("0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1").unwrap()
+            }
+        }
+    }
+}
+

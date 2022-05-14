@@ -1,124 +1,141 @@
 use std::env;
 use std::fmt::Display;
+use std::ops::{Add, Sub, SubAssign};
 use std::rc::Rc;
-use dotenv::dotenv;
+use std::time::Duration;
 use std::sync::Arc;
 use std::str::FromStr;
-use diesel::QueryResult;
-use ethers::abi::Tokenizable;
-use super::models::{NewPair, NewProtocol, *};
 
 use tokio;
+use hex::ToHex;
+use dotenv::dotenv;
+
 use ethers::prelude::*;
+use ethers::abi::Tokenizable;
+use ethers::prelude::ValueOrArray::Value;
 use ethers::contract::Contract;
+use ethers::abi::{ParamType, Tokenize};
 use ethers::providers::{JsonRpcClient, Http};
 use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
-use hex::ToHex;
 use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
 use crate::db::postgres::PgPool;
 use crate::dex::models;
+use crate::dex::models::{NewPair, NewProtocol};
+use crate::EventType;
+
+enum AssemblerError {}
 
 pub struct Assembler {
-    pub node_url: String,
-    pub factory_address: Address,
+    pub node: String,
+    pub factory: Address,
     client: Arc<Provider::<Http>>,
     pool: Rc<PgPool>
 }
 
 impl Assembler {
-    pub fn make(node: String, factory: String, pool: Rc<PgPool>) -> Assembler {
+    pub fn make(node: String, factory: Address, pool: Rc<PgPool>) -> Assembler {
         Assembler {
-            node_url: node.clone(),
-            factory_address: Address::from_str(factory.as_str()).unwrap(),
-            client: Arc::new(Provider::<Http>::try_from(node.clone()).unwrap()),
-            pool
+            factory, pool,
+            node: node.clone(),
+            client: Arc::new(Provider::<Http>::try_from(node.clone()).unwrap())
         }
     }
 
     pub async fn polling(&self) -> std::io::Result<bool> {
+        let conn = &self.pool.get().unwrap();
 
-        let length = self.fetch_pairs_length().await.unwrap();
+        let blocks_per_loop = U64::from(100000);
+        // let start_block_number: U64 = U64::from(10008355);
+        // let latest_block_number: U64 = U64::from(10042267);
+        let start_block_number: U64 = U64::from(10000835);
+        let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
 
-        //
-        // let _protocol = NewProtocol {
-        //     name: "Uniswap Protocol".to_string(),
-        //     official_url: Option::Some("https://uniswap.org/".to_string()),
-        //     network: "ETHEREUM_MAINNET".to_string(),
-        //     description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
-        //     symbol: Some("uniswap-v2".to_string()),
-        //     router_address: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
-        //     factory_address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_uppercase()
-        // };
-        //
-        // let conn = &self.pool.get().unwrap();
-        // models::add_new_protocol(_protocol, conn);
-        for index in 0..length {
-            let address = self.fetch_pair_address(index).await.unwrap();
-            let new_pair = self.fetch_pair_info(address, index).await.unwrap();
+        let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
+        let mut blocks_remain = initialize_blocks_remain;
 
-            println!("NewPair info: {:?}", new_pair);
+        let mut meet_last_loop = false;
+        while blocks_remain > U64::zero() {
 
-            let conn = &self.pool.get().unwrap();
-            match models::add_new_pair(new_pair, conn) {
+            println!("start");
+
+            let mut start_block_per_loop;
+            let mut end_block_per_loop;
+
+            if initialize_blocks_remain <= blocks_per_loop {
+                start_block_per_loop = start_block_number;
+                end_block_per_loop = latest_block_number;
+                meet_last_loop = true;
+            } else {
+                // Calculate start end block
+                start_block_per_loop = start_block_number.add(initialize_blocks_remain.sub(blocks_remain));
+                if meet_last_loop {
+                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_remain);
+                } else {
+                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_per_loop);
+                }
+            }
+
+            println!("{}", start_block_per_loop.to_string());
+            println!("{}", end_block_per_loop.to_string());
+
+            let pairs = self.syncing_range_blocks(
+                BlockNumber::Number(start_block_per_loop),
+                BlockNumber::Number(end_block_per_loop),
+                EventType::PairCreated
+            ).await;
+
+            match models::add_new_pairs(pairs, conn) {
                 Ok(_) => {
-                    println!("Success");
+                    // println!("Success: {:?}", pair);
                 }
                 Err(e) => {
                     println!("{}", e);
                     break;
                 }
             }
-        }
-        Ok(true)
-    }
 
-    async fn fetch_pairs_length(&self) -> Result<i64, HttpClientError> {
-        let factory_contract = IUniSwapV2Factory::new(self.factory_address.clone(), Arc::clone(&self.client));
-        let pairs_length: U256 = factory_contract.all_pairs_length().call().await.unwrap();
-        Ok(pairs_length.as_u64() as i64)
-    }
-
-    async fn fetch_pair_address(&self, index: i64) -> Result<Address, HttpClientError> {
-        let factory_contract = IUniSwapV2Factory::new(self.factory_address.clone(), Arc::clone(&self.client));
-        let pair_address: Address = factory_contract.all_pairs(U256::from(index)).call().await.unwrap();
-
-        Ok(pair_address)
-    }
-
-    async fn fetch_pair_info(&self, address: Address, index: i64) -> Result<NewPair, HttpClientError> {
-        let pair_contract = IUniswapV2Pair::new(address.clone(), Arc::clone(&self.client));
-
-        let token0: Address = pair_contract.token_0().call().await.unwrap();
-        let token1: Address = pair_contract.token_1().call().await.unwrap();
-
-        let mut pair_address_format = serde_json::to_string(&address).unwrap();
-        let mut token0_format = serde_json::to_string(&token0).unwrap();
-        let mut token1_format = serde_json::to_string(&token1).unwrap();
-        let mut factory_address_format = serde_json::to_string(&self.factory_address).unwrap();
-
-        pair_address_format.retain(|c| c != '\"');
-        token0_format.retain(|c| c != '\"');
-        token1_format.retain(|c| c != '\"');
-        factory_address_format.retain(|c| c != '\"');
-
-        // token0.to
-        let (reserve0_, reserve1_, _) = pair_contract.get_reserves().call().await.unwrap();
-        // let mid_price = f64::powi(10.0, 18 - 6) * reserve1 as f64 / reserve0 as f64;
-
-        // let s = token0.fmt()
-
-        // println!("{}", to);
-        Ok(
-            NewPair {
-                pair_address: pair_address_format,
-                pair_index: index,
-                token0: token0_format,
-                token1: token1_format,
-                reserve0: reserve0_.to_string(),
-                reserve1: reserve1_.to_string(),
-                factory: factory_address_format
+            // last loop flag
+            if meet_last_loop {
+                break;
             }
-        )
+            if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
+                meet_last_loop = true;
+            }
+            blocks_remain.sub_assign(blocks_per_loop);
+        }
+
+        Result::Ok(true)
+    }
+
+    async fn syncing_range_blocks(&self, from: BlockNumber, to: BlockNumber, event: EventType) -> Vec<NewPair> {
+        let filter = Filter::default()
+            .address(ValueOrArray::Value(self.factory))
+            .topic0(Value(event.topic_hash()))
+            .from_block(from)
+            .to_block(to);
+
+        let logs = self.client.get_logs(&filter).await.unwrap();
+        let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
+        for log in logs {
+            let data = &log.data.to_vec();
+            let parameters = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap();
+
+            let token0 = Address::from(log.topics[1]).to_string();
+            let token1 = Address::from(log.topics[2]).to_string();
+            let pair_address = parameters[0].to_string();
+
+            let pair = NewPair {
+                pair_address,
+                pair_index: 0,
+                token0,
+                token1,
+                reserve0: "".to_string(),
+                reserve1: "".to_string(),
+                factory: self.factory.to_string()
+            };
+            pairs.push(pair);
+        }
+        pairs
     }
 }

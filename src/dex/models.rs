@@ -49,9 +49,9 @@ pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResul
     QueryResult::Ok(1)
 }
 
-pub fn add_new_pair(pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
+pub fn add_new_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResult<usize> {
     diesel::insert_into(pairs::table)
-        .values(&pair)
+        .values(&pairs)
         .execute(conn)
 }
 pub fn update_pair(new_pair: NewPair, conn: &PgConnection) -> QueryResult<usize> {
