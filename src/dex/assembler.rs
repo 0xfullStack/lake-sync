@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::str::FromStr;
 
 use tokio;
-use hex::ToHex;
 use dotenv::dotenv;
 
 use ethers::prelude::*;
@@ -15,6 +14,7 @@ use ethers::abi::Tokenizable;
 use ethers::prelude::ValueOrArray::Value;
 use ethers::contract::Contract;
 use ethers::abi::{ParamType, Tokenize};
+use ethers::abi::Error::Hex;
 use ethers::providers::{JsonRpcClient, Http};
 use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
@@ -23,6 +23,9 @@ use crate::db::postgres::PgPool;
 use crate::dex::models;
 use crate::dex::models::{NewPair, NewProtocol, NewReserve};
 use crate::{EventType, Protocol};
+use core::str;
+use hex::FromHex;
+
 
 enum AssemblerError {}
 
@@ -122,13 +125,7 @@ impl Assembler {
         let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
         for log in logs {
             let data = &log.data.to_vec();
-
-            println!("log: {:?}", &log);
-
-            // let s = H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap();
-            // let s = "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".as_bytes();
-            let factory_address = ethers::abi::decode(&vec![ParamType::Address], s).unwrap()[0].to_string();
-            // let factory_address = self.factory.to_string();
+            let factory_address = self.factory.into_token().to_string();
             let pair_address = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap()[0].to_string();
             let token0 = ethers::abi::decode(&vec![ParamType::Address], log.topics[1].as_bytes()).unwrap()[0].to_string();
             let token1 = ethers::abi::decode(&vec![ParamType::Address], log.topics[2].as_bytes()).unwrap()[0].to_string();
@@ -195,8 +192,8 @@ impl Assembler {
             pair_index_.add_assign(reserves.len() as i64);
 
             match models::batch_update_reserves(reserves, conn) {
-                Ok(_) => {
-                    // println!("Success: {:?}", pair);
+                Ok(count) => {
+                    println!("Success count: {:?}", count);
                 }
                 Err(e) => {
                     println!("{}", e);
@@ -230,10 +227,10 @@ impl Assembler {
             let data = &log.data.to_vec();
             let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
             let reserve = NewReserve {
-                reserve0: parameters[0].to_string(),
-                reserve1: parameters[1].to_string()
+                reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
+                reserve1: parameters[1].clone().into_uint().unwrap().to_string()
             };
-            reserves.push((log.address.to_string(), reserve));
+            reserves.push((log.address.into_token().to_string(), reserve));
         }
         reserves
     }

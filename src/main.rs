@@ -114,11 +114,9 @@ impl EventType {
                 U64::from(100_000)
             }
             EventType::Sync => {
-                U64::from(1_000)
+                U64::from(50_000)
             }
         }
     }
-
-
 }
 

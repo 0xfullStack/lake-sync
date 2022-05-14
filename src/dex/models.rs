@@ -68,7 +68,7 @@ pub struct NewReserve {
 pub fn batch_update_reserves(reserves: Vec<(String, NewReserve)>, conn: &PgConnection) -> QueryResult<usize> {
     let mut execute_success_count = 0;
     for element in reserves {
-        println!("Update reserve error, pair_address: {:?}, reserve: {:?}", element.0, element.1);
+        println!("Start Update for pair_address: {:?}, reserve: {:?}", element.0, element.1);
         match update_reserve(element.0, element.1, conn) {
             Ok(_) => {
                 execute_success_count.add_assign(1);
