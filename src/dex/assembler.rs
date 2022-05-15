@@ -138,7 +138,8 @@ impl Assembler {
                 token1,
                 reserve0: "".to_string(),
                 reserve1: "".to_string(),
-                factory: factory_address
+                factory: factory_address,
+                block_number: log.block_number.unwrap().as_u64() as i64
             };
             pairs.push(pair);
         }

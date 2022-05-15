@@ -9,8 +9,10 @@ CREATE TABLE "pairs" (
                          "reserve0" text NOT NULL,
                          "reserve1" text NOT NULL,
                          "factory" char(42) NOT NULL,
+                         "block_number" bigint NOT NULL,
                          PRIMARY KEY ("id"),
-                         CONSTRAINT "pair_id" UNIQUE ("id")
+                         CONSTRAINT "pair_id" UNIQUE ("id"),
+                         CONSTRAINT "pair_address" UNIQUE ("pair_address")
 );
 
 CREATE TABLE "protocols" (
@@ -28,4 +30,7 @@ CREATE TABLE "protocols" (
 );
 
 ALTER TABLE "pairs" ADD CONSTRAINT "fk_protocol_factory_address" FOREIGN KEY ("factory") REFERENCES "protocols" ("factory_address");
+
+CREATE INDEX "index_block_number" ON "pairs" ("block_number");
+CREATE UNIQUE INDEX "index_pair_address" ON "pairs" ("pair_address");
 

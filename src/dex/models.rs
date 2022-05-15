@@ -26,21 +26,31 @@ pub struct NewPair {
     pub token1: String,
     pub reserve0: String,
     pub reserve1: String,
-    pub factory: String
+    pub factory: String,
+    pub block_number: i64
 }
 
-/*
-        let _protocol = create_protocol(
-            &connection,
-            "Uniswap Protocol",
-            Some("https://uniswap.org/"),
-            "ETHEREUM_MAINNET",
-            Some("Swap, earn, and build on the leading decentralized crypto trading protocol."),
-            Some("uniswap-v2"),
-            "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-            "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
-        );
-     */
+pub fn add_uniswap_v2(conn: &PgConnection)  {
+    let _protocol = NewProtocol {
+        name: "Uniswap Protocol".to_string(),
+        official_url: Option::Some("https://uniswap.org/".to_string()),
+        network: "ETHEREUM_MAINNET".to_string(),
+        description: Option::Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
+        symbol: Option::Some("uniswap-v2".to_string()),
+        router_address: "7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
+        factory_address: "5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
+    };
+
+    match add_new_protocol(_protocol, conn) {
+        Ok(_) => {
+            println!("Insert success");
+        }
+        Err(e) => {
+            println!("{:?}", e);
+        }
+    }
+}
+
 pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
     diesel::insert_into(protocols::table)
         .values(&protocol)

@@ -46,6 +46,7 @@ async fn main() -> std::io::Result<()> {
 
     // Infinite Loop
     aggregator.start_syncing().await;
+
     Result::Ok(())
 }
 

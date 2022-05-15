@@ -8,6 +8,7 @@ table! {
         reserve0 -> Text,
         reserve1 -> Text,
         factory -> Bpchar,
+        block_number -> Int8,
     }
 }
 
