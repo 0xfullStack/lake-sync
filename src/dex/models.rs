@@ -68,7 +68,7 @@ pub struct NewReserve {
 pub fn batch_update_reserves(reserves: Vec<(String, NewReserve)>, conn: &PgConnection) -> QueryResult<usize> {
     let mut execute_success_count = 0;
     for element in reserves {
-        println!("Start Update for pair_address: {:?}, reserve: {:?}", element.0, element.1);
+        // println!("Start Update for pair_address: {:?}, reserve: {:?}", element.0, element.1);
         match update_reserve(element.0, element.1, conn) {
             Ok(_) => {
                 execute_success_count.add_assign(1);
@@ -83,7 +83,7 @@ pub fn batch_update_reserves(reserves: Vec<(String, NewReserve)>, conn: &PgConne
 
 pub fn update_reserve(pair_address_: String, reserve: NewReserve, conn: &PgConnection) -> QueryResult<usize> {
     diesel::update(pairs::table)
-        .filter( pair_address.eq(pair_address_))
         .set(&reserve)
+        .filter(pair_address.eq(pair_address_.as_str()))
         .execute(conn)
 }

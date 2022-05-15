@@ -45,7 +45,7 @@ impl Assembler {
         }
     }
 
-    pub async fn polling(&self) -> std::io::Result<bool> {
+    pub async fn polling_pairs(&self) -> std::io::Result<bool> {
         let conn = &self.pool.get().unwrap();
 
         let blocks_per_loop = EventType::PairCreated.blocks_per_loop();
@@ -145,11 +145,8 @@ impl Assembler {
         pairs
     }
 
-    pub async fn polling_sync(&self) -> std::io::Result<bool> {
+    pub async fn polling_reserves(&self) -> std::io::Result<bool> {
         let conn = &self.pool.get().unwrap();
-
-        // let start_block_number: U64 = U64::from(10008355);
-        // let latest_block_number: U64 = U64::from(10042267);
 
         let blocks_per_loop = EventType::Sync.blocks_per_loop();
         let start_block_number: U64 = Protocol::UNISwapV2.star_block_number();
@@ -230,6 +227,7 @@ impl Assembler {
                 reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
                 reserve1: parameters[1].clone().into_uint().unwrap().to_string()
             };
+            println!("{:?}", log);
             reserves.push((log.address.into_token().to_string(), reserve));
         }
         reserves

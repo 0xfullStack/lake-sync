@@ -20,6 +20,7 @@ use db::postgres::*;
 use ethers::prelude::U64;
 use ethers::types::{ H256, H160 };
 use crate::dex::aggregator::Aggregator;
+use crate::dex::models::{NewReserve, update_reserve};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -114,7 +115,7 @@ impl EventType {
                 U64::from(100_000)
             }
             EventType::Sync => {
-                U64::from(10_000)
+                U64::from(1_000)
             }
         }
     }

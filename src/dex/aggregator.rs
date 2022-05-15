@@ -34,9 +34,11 @@ impl Aggregator {
         Aggregator { assembler, subscriber, protocol }
     }
 
+
+
     pub async fn start_syncing(&self) {
-        // self.assembler.polling().await;
-        self.assembler.polling_sync().await;
+        self.assembler.polling_pairs().await;
+        self.assembler.polling_reserves().await;
         // self.subscriber.listening().await;
     }
 }
