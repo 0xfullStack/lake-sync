@@ -1,9 +1,8 @@
 use std::ops::AddAssign;
 use diesel::prelude::*;
-use diesel::{Insertable};
 use diesel::table;
 use crate::db::schema::{protocols, pairs};
-use crate::db::schema::pairs::{pair_address, reserve0, reserve1};
+use crate::db::schema::pairs::{ pair_address, reserve0, reserve1, block_number };
 
 #[derive(Insertable, Debug)]
 #[table_name="protocols"]
@@ -67,6 +66,14 @@ pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResu
         .execute(conn)
 }
 
+type DBError = Box<dyn std::error::Error + Send + Sync>;
+pub fn get_addresses(conn: &PgConnection, from_block_number: i64, to_block_number: i64) -> Result<Vec<String>, DBError> {
+    let address_list = pairs::table
+        .filter(block_number.between(from_block_number, to_block_number))
+        .select(pair_address)
+        .load::<String>(conn)?;
+    Ok(address_list)
+}
 
 #[derive(AsChangeset, Debug)]
 #[table_name="pairs"]

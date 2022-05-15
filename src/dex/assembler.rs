@@ -21,7 +21,7 @@ use ethers::providers::HttpClientError;
 use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{NewPair, NewProtocol, NewReserve};
+use crate::dex::models::{get_addresses, NewPair, NewProtocol, NewReserve};
 use crate::{EventType, Protocol};
 use core::str;
 use hex::FromHex;
@@ -183,8 +183,8 @@ impl Assembler {
             println!("{}", end_block_per_loop.to_string());
 
             let reserves = self.syncing_reserves(
-                BlockNumber::Number(start_block_per_loop),
-                BlockNumber::Number(end_block_per_loop)
+                start_block_per_loop.as_u64() as i64,
+                end_block_per_loop.as_u64() as i64
             ).await;
 
             pair_index_.add_assign(reserves.len() as i64);
@@ -213,11 +213,28 @@ impl Assembler {
         Result::Ok(true)
     }
 
-    async fn syncing_reserves(&self, from: BlockNumber, to: BlockNumber) -> Vec<(String, NewReserve)> {
+    fn load_eligible_addresses(&self, from: i64, to: i64) -> Vec<Address> {
+        let conn = &self.pool.get().unwrap();
+        let addresses_from_db = get_addresses(conn, from, to).unwrap();
+        println!("eligible_addresses: {}", addresses_from_db.len());
+
+        let mut addresses: Vec<Address> = Vec::with_capacity(addresses_from_db.len());
+
+        addresses_from_db
+            .iter()
+            .map(|address| {
+                Address::from_str(address.as_str()).unwrap()
+            })
+            .collect()
+    }
+
+    async fn syncing_reserves(&self, from: i64, to: i64) -> Vec<(String, NewReserve)> {
+        let eligible_addresses = self.load_eligible_addresses(from, to);
         let filter = Filter::default()
+            .address(ValueOrArray::Array(eligible_addresses))
             .topic0(Value(EventType::Sync.topic_hash()))
-            .from_block(from)
-            .to_block(to);
+            .from_block(BlockNumber::Number(U64::from(from)))
+            .to_block(BlockNumber::Number(U64::from(to)));
 
         let logs = self.client.get_logs(&filter).await.unwrap();
         let mut reserves: Vec<(String, NewReserve)> = Vec::with_capacity(logs.len());
