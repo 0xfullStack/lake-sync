@@ -20,7 +20,7 @@ use db::postgres::*;
 use ethers::prelude::U64;
 use ethers::types::{ H256, H160 };
 use crate::dex::aggregator::Aggregator;
-use crate::dex::models::{NewReserve, update_reserve};
+use crate::dex::models::{NewProtocol, NewReserve, NewReserveLog};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -55,7 +55,7 @@ pub struct Node {
     pub ws: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Protocol {
     UNISwapV2,
     UNISwapV3,
@@ -93,6 +93,44 @@ impl Protocol {
             }
             Protocol::UNISwapV3 => {
                 U64::from(10000835)
+            }
+        }
+    }
+
+    fn protocol_info(&self) -> NewProtocol {
+        match self {
+            Protocol::SushiSwapV2 => {
+                NewProtocol {
+                    name: "Sushiswap Protocol".to_string(),
+                    official_url: Option::Some("".to_string()),
+                    network: "ETHEREUM_MAINNET".to_string(),
+                    description: Option::Some("".to_string()),
+                    symbol: Option::Some("sushiswap-v2".to_string()),
+                    router_address: "".to_string(),
+                    factory_address: "".to_string().to_lowercase()
+                }
+            },
+            Protocol::UNISwapV2 => {
+                NewProtocol {
+                    name: "Uniswap Protocol".to_string(),
+                    official_url: Option::Some("https://uniswap.org/".to_string()),
+                    network: "ETHEREUM_MAINNET".to_string(),
+                    description: Option::Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
+                    symbol: Option::Some("uniswap-v2".to_string()),
+                    router_address: "7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
+                    factory_address: "5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
+                }
+            }
+            Protocol::UNISwapV3 => {
+                NewProtocol {
+                    name: "Uniswap Protocol".to_string(),
+                    official_url: Option::Some("https://uniswap.org/".to_string()),
+                    network: "ETHEREUM_MAINNET".to_string(),
+                    description: Option::Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
+                    symbol: Option::Some("uniswap-v3".to_string()),
+                    router_address: "".to_string(),
+                    factory_address: "".to_string().to_lowercase()
+                }
             }
         }
     }

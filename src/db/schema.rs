@@ -5,11 +5,11 @@ table! {
         factory_address -> Bpchar,
         token0 -> Bpchar,
         token1 -> Bpchar,
+        block_number -> Int8,
+        block_hash -> Text,
+        transaction_hash -> Text,
         reserve0 -> Text,
         reserve1 -> Text,
-        block_number -> Int8,
-        block_hash -> Int8,
-        transaction_hash -> Text,
     }
 }
 
@@ -34,7 +34,7 @@ table! {
         reserve0 -> Text,
         reserve1 -> Text,
         block_number -> Int8,
-        block_hash -> Int8,
+        block_hash -> Text,
         transaction_hash -> Text,
     }
 }
