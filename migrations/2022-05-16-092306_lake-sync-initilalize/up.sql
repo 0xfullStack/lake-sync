@@ -31,7 +31,7 @@ CREATE TABLE "Pair" (
     CONSTRAINT "pair_address" UNIQUE ("pair_address")
 );
 
-CREATE TABLE "ReserveLog_Uniswap_V2" (
+CREATE TABLE "ReserveLog" (
     "id" serial8,
     "pair_address" char(42) NOT NULL,
     "reserve0" text NOT NULL,
@@ -44,13 +44,13 @@ CREATE TABLE "ReserveLog_Uniswap_V2" (
 );
 
 ALTER TABLE "Pair" ADD CONSTRAINT "fk_protocol_factory_address" FOREIGN KEY ("factory_address") REFERENCES "Protocol" ("factory_address");
-ALTER TABLE "ReserveLog_Uniswap_V2" ADD CONSTRAINT "fk_pair_pair_address" FOREIGN KEY ("pair_address") REFERENCES "Pair" ("pair_address");
+-- ALTER TABLE "ReserveLog" ADD CONSTRAINT "fk_pair_pair_address" FOREIGN KEY ("pair_address") REFERENCES "Pair" ("pair_address");
 
 CREATE INDEX "index_pair_block_number" ON "Pair" ("block_number");
 CREATE INDEX "index_pair_factory_address" ON "Pair" ("factory_address");
 CREATE UNIQUE INDEX "index_pair_pair_address" ON "Pair" ("pair_address");
 
-CREATE INDEX "index_reservelog_block_number" ON "ReserveLog_Uniswap_V2" ("block_number");
-CREATE INDEX "index_reservelog_pair_address" ON "ReserveLog_Uniswap_V2" ("pair_address");
+CREATE INDEX "index_reservelog_block_number" ON "ReserveLog" ("block_number");
+CREATE INDEX "index_reservelog_pair_address" ON "ReserveLog" ("pair_address");
 
 

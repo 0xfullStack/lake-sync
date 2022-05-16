@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 use diesel::prelude::*;
 use diesel::{sql_query, table};
 use ethers::core::rand::seq::index::IndexVec::USize;
-use crate::db::schema::{Protocol, Pair, ReserveLog_Uniswap_V2};
+use crate::db::schema::{Protocol, Pair, ReserveLog};
 use crate::db::schema::Pair::{ pair_address, reserve0, reserve1, block_number };
 use crate::U64;
 
@@ -33,7 +33,7 @@ pub struct NewPair {
 }
 
 #[derive(Insertable, Debug)]
-#[table_name="ReserveLog_Uniswap_V2"]
+#[table_name="ReserveLog"]
 pub struct NewReserveLog {
     pub pair_address: String,
     pub reserve0: String,
@@ -62,16 +62,16 @@ pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) 
 
     if count >= 65535 {
         let from = logs.len()/2;
-        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+        diesel::insert_into(ReserveLog::table)
             .values(&logs[..from])
             .execute(conn);
 
         let to = (logs.len()/2)+1;
-        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+        diesel::insert_into(ReserveLog::table)
             .values(&logs[to..])
             .execute(conn)
     } else {
-        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+        diesel::insert_into(ReserveLog::table)
             .values(&logs)
             .execute(conn)
     }

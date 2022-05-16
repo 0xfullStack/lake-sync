@@ -27,7 +27,7 @@ table! {
 }
 
 table! {
-    ReserveLog_Uniswap_V2 (id) {
+    ReserveLog (id) {
         id -> Int8,
         pair_address -> Bpchar,
         reserve0 -> Text,
@@ -41,5 +41,5 @@ table! {
 allow_tables_to_appear_in_same_query!(
     Pair,
     Protocol,
-    ReserveLog_Uniswap_V2,
+    ReserveLog,
 );
