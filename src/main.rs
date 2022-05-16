@@ -59,7 +59,7 @@ pub struct Node {
 pub enum Protocol {
     UNISwapV2,
     UNISwapV3,
-    SushiSwap
+    SushiSwapV2
 }
 
 #[derive(Debug)]
@@ -71,8 +71,8 @@ pub enum EventType {
 impl Protocol {
     fn factory_address(&self) -> H160 {
         match self {
-            Protocol::SushiSwap => {
-                H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
+            Protocol::SushiSwapV2 => {
+                H160::from_str("0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac").unwrap()
             },
             Protocol::UNISwapV2 => {
                 H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
@@ -85,7 +85,7 @@ impl Protocol {
 
     fn star_block_number(&self) -> U64 {
         match self {
-            Protocol::SushiSwap => {
+            Protocol::SushiSwapV2 => {
                 U64::from(10000835)
             },
             Protocol::UNISwapV2 => {

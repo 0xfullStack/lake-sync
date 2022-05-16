@@ -1,6 +1,6 @@
 use std::env;
 use std::fmt::Display;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 use std::rc::Rc;
 use std::time::Duration;
 use std::sync::Arc;
@@ -18,22 +18,28 @@ use ethers::abi::Error::Hex;
 use ethers::providers::{JsonRpcClient, Http};
 use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
-use crate::abi::abis::{IUniSwapV2Factory, IUniswapV2Pair};
 use crate::db::postgres::PgPool;
 use crate::dex::models;
 use crate::dex::models::{get_addresses, NewPair, NewProtocol, NewReserve};
 use crate::{EventType, Protocol};
 use core::str;
-use hex::FromHex;
 
-
-enum AssemblerError {}
+#[derive(Debug)]
+enum AssemblerError {
+    ReachMaxLimit
+}
 
 pub struct Assembler {
     pub node: String,
     pub factory: Address,
     client: Arc<Provider::<Http>>,
     pool: Rc<PgPool>
+}
+
+struct BlockRange {
+    pub from: U64,
+    pub to: U64,
+    pub blocks_per_loop: U64
 }
 
 impl Assembler {
@@ -110,7 +116,7 @@ impl Assembler {
         }
 
         println!("Pair sync finished");
-        Result::Ok(true)
+        Ok(true)
     }
 
     async fn syncing_pairs(&self, from: BlockNumber, to: BlockNumber, last_pair_index: i64) -> Vec<NewPair> {
@@ -147,20 +153,17 @@ impl Assembler {
     }
 
     pub async fn polling_reserves(&self) -> std::io::Result<bool> {
-        let conn = &self.pool.get().unwrap();
-
-        let blocks_per_loop = EventType::Sync.blocks_per_loop();
+        let mut blocks_per_loop = EventType::Sync.blocks_per_loop();
         let start_block_number: U64 = Protocol::UNISwapV2.star_block_number();
         let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
 
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
         let mut blocks_remain = initialize_blocks_remain;
         let mut meet_last_loop = false;
-        let mut pair_index_: i64 = 0;
 
         while blocks_remain > U64::zero() {
 
-            println!("start");
+            println!(" - - Start syncing reserves");
 
             let mut start_block_per_loop;
             let mut end_block_per_loop;
@@ -168,9 +171,7 @@ impl Assembler {
             if initialize_blocks_remain <= blocks_per_loop {
                 start_block_per_loop = start_block_number;
                 end_block_per_loop = latest_block_number;
-                meet_last_loop = true;
             } else {
-                // Calculate start end block
                 start_block_per_loop = start_block_number.add(initialize_blocks_remain.sub(blocks_remain));
                 if meet_last_loop {
                     end_block_per_loop = start_block_per_loop.sub(1).add(blocks_remain);
@@ -179,64 +180,50 @@ impl Assembler {
                 }
             }
 
-            println!("{}", start_block_per_loop.to_string());
-            println!("{}", end_block_per_loop.to_string());
-
-            let reserves = self.syncing_reserves(
+            let result = self.fetch_reserve_logs(
                 start_block_per_loop.as_u64() as i64,
                 end_block_per_loop.as_u64() as i64
             ).await;
 
-            pair_index_.add_assign(reserves.len() as i64);
+            match result {
+                Ok(logs_) => {
+                    self.syncing_into_db(logs_);
 
-            match models::batch_update_reserves(reserves, conn) {
-                Ok(count) => {
-                    println!("Success count: {:?}", count);
+                    println!(" - - Syncing reserves successfully from: {:?} to: {:?}", start_block_per_loop.to_string(), end_block_per_loop.to_string());
+
+                    // last loop flag
+                    if meet_last_loop {
+                        break;
+                    }
+                    if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
+                        meet_last_loop = true;
+                    }
+                    blocks_remain.sub_assign(blocks_per_loop);
+                    blocks_per_loop = EventType::Sync.blocks_per_loop();
                 }
                 Err(e) => {
-                    println!("{}", e);
-                    break;
+                    println!(" - - Syncing reserves failure from: {:?} to: {:?}", start_block_per_loop.to_string(), end_block_per_loop.to_string());
+                    println!(" - - Cut blocks per loop by half");
+                    println!();
+                    blocks_per_loop = blocks_per_loop / 2;
+                    continue;
                 }
             }
-
-            // last loop flag
-            if meet_last_loop {
-                break;
-            }
-            if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
-                meet_last_loop = true;
-            }
-            blocks_remain.sub_assign(blocks_per_loop);
         }
-
         println!("Reserves sync finished");
-        Result::Ok(true)
+        Ok(true)
     }
 
-    fn load_eligible_addresses(&self, from: i64, to: i64) -> Vec<Address> {
-        let conn = &self.pool.get().unwrap();
-        let addresses_from_db = get_addresses(conn, from, to).unwrap();
-        println!("eligible_addresses: {}", addresses_from_db.len());
-
-        let mut addresses: Vec<Address> = Vec::with_capacity(addresses_from_db.len());
-
-        addresses_from_db
-            .iter()
-            .map(|address| {
-                Address::from_str(address.as_str()).unwrap()
-            })
-            .collect()
-    }
-
-    async fn syncing_reserves(&self, from: i64, to: i64) -> Vec<(String, NewReserve)> {
-        let eligible_addresses = self.load_eligible_addresses(from, to);
+    async fn fetch_reserve_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
-            .address(ValueOrArray::Array(eligible_addresses))
             .topic0(Value(EventType::Sync.topic_hash()))
             .from_block(BlockNumber::Number(U64::from(from)))
             .to_block(BlockNumber::Number(U64::from(to)));
+        self.client.get_logs(&filter).await
+    }
 
-        let logs = self.client.get_logs(&filter).await.unwrap();
+    fn syncing_into_db(&self, logs: Vec<Log>) {
+        let conn = &self.pool.get().unwrap();
         let mut reserves: Vec<(String, NewReserve)> = Vec::with_capacity(logs.len());
         for log in logs {
             let data = &log.data.to_vec();
@@ -245,9 +232,30 @@ impl Assembler {
                 reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
                 reserve1: parameters[1].clone().into_uint().unwrap().to_string()
             };
-            println!("{:?}", log);
             reserves.push((log.address.into_token().to_string(), reserve));
         }
-        reserves
+
+        match models::batch_update_reserves(reserves, conn) {
+            Ok(count) => {
+                println!("Update into db count: {:?}", count);
+            }
+            Err(e) => {
+                println!("{}", e);
+            }
+        }
+    }
+
+    fn load_eligible_addresses(&self, to: i64) -> Vec<Address> {
+        let from = Protocol::UNISwapV2.star_block_number().as_u64() as i64;
+        let conn = &self.pool.get().unwrap();
+        let addresses_from_db = get_addresses(conn, from, to).unwrap();
+        println!("eligible_addresses: {}", addresses_from_db.len());
+
+        addresses_from_db
+            .iter()
+            .map(|address| {
+                Address::from_str(address.as_str()).unwrap()
+            })
+            .collect()
     }
 }

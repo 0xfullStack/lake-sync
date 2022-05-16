@@ -95,12 +95,12 @@ pub fn batch_update_reserves(reserves: Vec<(String, NewReserve)>, conn: &PgConne
             }
         }
     }
+
     Ok(execute_success_count)
 }
 
 pub fn update_reserve(pair_address_: String, reserve: NewReserve, conn: &PgConnection) -> QueryResult<usize> {
-    diesel::update(pairs::table)
+    diesel::update(pairs::table.filter(pair_address.eq(pair_address_.as_str())))
         .set(&reserve)
-        .filter(pair_address.eq(pair_address_.as_str()))
         .execute(conn)
 }
