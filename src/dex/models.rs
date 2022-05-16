@@ -1,8 +1,10 @@
 use std::ops::AddAssign;
 use diesel::prelude::*;
-use diesel::table;
-use crate::db::schema::{Protocol, Pair, ReserveLog};
+use diesel::{sql_query, table};
+use ethers::core::rand::seq::index::IndexVec::USize;
+use crate::db::schema::{Protocol, Pair, ReserveLog_Uniswap_V2};
 use crate::db::schema::Pair::{ pair_address, reserve0, reserve1, block_number };
+use crate::U64;
 
 #[derive(Insertable, Debug)]
 #[table_name="Protocol"]
@@ -31,10 +33,9 @@ pub struct NewPair {
 }
 
 #[derive(Insertable, Debug)]
-#[table_name="ReserveLog"]
+#[table_name="ReserveLog_Uniswap_V2"]
 pub struct NewReserveLog {
     pub pair_address: String,
-    pub factory_address: String,
     pub reserve0: String,
     pub reserve1: String,
     pub block_number: i64,
@@ -55,9 +56,32 @@ pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResu
 }
 
 pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) -> QueryResult<usize> {
-    diesel::insert_into(ReserveLog::table)
-        .values(&logs)
-        .execute(conn)
+
+    let parameter_count = 6;
+    let mut count = logs.len() * parameter_count;
+
+    if count >= 65535 {
+        let from = logs.len()/2;
+        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+            .values(&logs[..from])
+            .execute(conn);
+
+        let to = (logs.len()/2)+1;
+        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+            .values(&logs[to..])
+            .execute(conn)
+    } else {
+        diesel::insert_into(ReserveLog_Uniswap_V2::table)
+            .values(&logs)
+            .execute(conn)
+    }
+}
+
+pub fn get_last_pair_block_height(conn: &PgConnection) -> QueryResult<i64> {
+    Pair::table
+        .select(block_number)
+        .order_by(block_number.desc())
+        .first(conn)
 }
 
 // type DBError = Box<dyn std::error::Error + Send + Sync>;

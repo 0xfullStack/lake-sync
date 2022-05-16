@@ -20,7 +20,7 @@ use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{NewPair, NewProtocol, NewReserve};
+use crate::dex::models::{get_last_pair_block_height, NewPair, NewProtocol, NewReserve};
 use crate::{EventType, NewReserveLog, Protocol};
 use core::str;
 use serde::Serialize;
@@ -55,7 +55,16 @@ impl Assembler {
     pub async fn polling_pairs(&self) -> std::io::Result<bool> {
         let conn = &self.pool.get().unwrap();
         let blocks_per_loop = EventType::PairCreated.blocks_per_loop();
-        let start_block_number: U64 = self.protocol.star_block_number();
+
+        let latest_block_in_table = get_last_pair_block_height(conn).unwrap_or(0);
+        let latest_block = U64::from(latest_block_in_table);
+        let mut start_block_number: U64;
+        if latest_block > self.protocol.star_block_number() {
+            start_block_number = latest_block;
+        } else {
+            start_block_number = self.protocol.star_block_number();
+        }
+
         let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
 
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
@@ -200,7 +209,12 @@ impl Assembler {
                     blocks_per_loop = EventType::Sync.blocks_per_loop();
                 }
                 Err(e) => {
-                    println!(" - 2 - Fetching reserve logs failure {:?} from: {:?} to: {:?}, and cut blocks per loop by half", e, start_block_per_loop.to_string(), end_block_per_loop.to_string());
+                    // code: -32602, message: "Log response size exceeded.
+                    // You can make eth_getLogs requests with up to a 2K block range and no limit on the response size,
+                    // or you can request any block range with a cap of 10K logs in the response. Based on your parameters and the response size limit,
+                    // this block range should work: [0xa0beb9, 0xa0c2f5]", data: None }))
+
+                    println!(" - 2 - Fetching reserve logs failure from: {:?} to: {:?}, error: {:?}, cut by half", start_block_per_loop.to_string(), end_block_per_loop.to_string(), e);
                     println!();
                     blocks_per_loop = blocks_per_loop / 2;
                     continue;
@@ -224,7 +238,6 @@ impl Assembler {
         let mut reserve_logs: Vec<NewReserveLog> = Vec::with_capacity(logs.len());
         for log in logs {
             let data = &log.data.to_vec();
-            let factory_address = self.protocol.factory_address().into_token().to_string();
             let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
             let pair_address = log.address.into_token().to_string();
             let block_number = log.block_number.unwrap().as_u64() as i64;
@@ -233,7 +246,6 @@ impl Assembler {
 
             let log = NewReserveLog {
                 pair_address,
-                factory_address,
                 block_number,
                 reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
                 reserve1: parameters[1].clone().into_uint().unwrap().to_string(),
@@ -251,7 +263,7 @@ impl Assembler {
                 println!();
             }
             Err(e) => {
-                println!(" - 3 - Storing reserve logs {:?} failure: {:?}", e, _count);
+                println!(" - 3 - Storing reserve logs {:?} failure: {:?}", _count, e);
                 println!();
             }
         }
