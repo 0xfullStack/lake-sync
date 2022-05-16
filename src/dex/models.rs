@@ -48,13 +48,15 @@ pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResu
         .execute(conn)
 }
 
-pub fn update_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResult<usize> {
-    QueryResult::Ok(1)
-}
-
 pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResult<usize> {
     diesel::insert_into(Pair::table)
         .values(&pairs)
+        .execute(conn)
+}
+
+pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) -> QueryResult<usize> {
+    diesel::insert_into(ReserveLog::table)
+        .values(&logs)
         .execute(conn)
 }
 

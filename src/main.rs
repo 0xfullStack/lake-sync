@@ -34,8 +34,8 @@ async fn main() -> std::io::Result<()> {
     let pool = init_pool(&database_url).expect("Failed to create pool");
 
     // Node
-    let http = (&env::var("INFURA_NODE_HTTP").unwrap()).to_string();
-    let ws   = (&env::var("INFURA_NODE_WS").unwrap()).to_string();
+    let http = (&env::var("ALCHEMY_NODE_HTTP").unwrap()).to_string();
+    let ws   = (&env::var("ALCHEMY_NODE_WS").unwrap()).to_string();
 
     // Start Service
     let aggregator = Aggregator::make(
@@ -154,7 +154,7 @@ impl EventType {
                 U64::from(100_000)
             }
             EventType::Sync => {
-                U64::from(50_000)
+                U64::from(10_000)
             }
         }
     }

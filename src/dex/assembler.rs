@@ -21,7 +21,7 @@ use ethers::providers::HttpClientError;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
 use crate::dex::models::{NewPair, NewProtocol, NewReserve};
-use crate::{EventType, Protocol};
+use crate::{EventType, NewReserveLog, Protocol};
 use core::str;
 use serde::Serialize;
 
@@ -122,6 +122,7 @@ impl Assembler {
             .from_block(from)
             .to_block(to);
 
+        // thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value: JsonRpcClientError(JsonRpcError(JsonRpcError { code: -32005, message: "query timeout exceeded", data: None }))'
         let logs = self.client.get_logs(&filter).await.unwrap();
         let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
         for log in logs {
@@ -150,7 +151,7 @@ impl Assembler {
         pairs
     }
 
-    pub async fn polling_reserves(&self) -> std::io::Result<bool> {
+    pub async fn polling_reserve_logs(&self) -> std::io::Result<bool> {
         let mut blocks_per_loop = EventType::Sync.blocks_per_loop();
         let start_block_number: U64 = self.protocol.star_block_number();
         let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
@@ -222,18 +223,29 @@ impl Assembler {
 
     fn syncing_into_db(&self, logs: Vec<Log>) {
         let conn = &self.pool.get().unwrap();
-        let mut reserves: Vec<(String, NewReserve)> = Vec::with_capacity(logs.len());
+        let mut reserve_logs: Vec<NewReserveLog> = Vec::with_capacity(logs.len());
         for log in logs {
             let data = &log.data.to_vec();
+            let factory_address = self.protocol.factory_address().into_token().to_string();
             let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
-            let reserve = NewReserve {
+            let pair_address = log.address.into_token().to_string();
+            let block_number = log.block_number.unwrap().as_u64() as i64;
+            let block_hash = log.block_hash.unwrap_or(H256::zero());
+            let transaction_hash = log.transaction_hash.unwrap_or(H256::zero());
+
+            let log = NewReserveLog {
+                pair_address,
+                factory_address,
+                block_number,
                 reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
-                reserve1: parameters[1].clone().into_uint().unwrap().to_string()
+                reserve1: parameters[1].clone().into_uint().unwrap().to_string(),
+                block_hash: serde_json::to_string(&block_hash).unwrap(),
+                transaction_hash: serde_json::to_string_pretty(&transaction_hash).unwrap(),
             };
-            reserves.push((log.address.into_token().to_string(), reserve));
+            reserve_logs.push(log);
         }
 
-        match models::batch_update_reserves(reserves, conn) {
+        match models::batch_insert_reserve_logs(reserve_logs, conn) {
             Ok(count) => {
                 println!("Update into db count: {:?}", count);
             }

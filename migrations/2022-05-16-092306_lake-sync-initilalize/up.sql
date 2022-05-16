@@ -54,6 +54,6 @@ CREATE UNIQUE INDEX "index_pair_pair_address" ON "Pair" ("pair_address");
 
 CREATE INDEX "index_reservelog_block_number" ON "ReserveLog" ("block_number");
 CREATE INDEX "index_reservelog_factory_address" ON "ReserveLog" ("factory_address");
-CREATE UNIQUE INDEX "index_reservelog_pair_address" ON "ReserveLog" ("pair_address");
+CREATE INDEX "index_reservelog_pair_address" ON "ReserveLog" ("pair_address");
 
 
