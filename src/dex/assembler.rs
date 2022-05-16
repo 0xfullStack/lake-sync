@@ -162,7 +162,7 @@ impl Assembler {
 
         while blocks_remain > U64::zero() {
 
-            println!(" - - Start syncing reserves");
+            println!(" - 1 - Start syncing reserves");
 
             let mut start_block_per_loop;
             let mut end_block_per_loop;
@@ -186,9 +186,8 @@ impl Assembler {
 
             match result {
                 Ok(logs_) => {
+                    println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), start_block_per_loop.to_string(), end_block_per_loop.to_string());
                     self.syncing_into_db(logs_);
-
-                    println!(" - - Syncing reserves successfully from: {:?} to: {:?}", start_block_per_loop.to_string(), end_block_per_loop.to_string());
 
                     // last loop flag
                     if meet_last_loop {
@@ -201,15 +200,14 @@ impl Assembler {
                     blocks_per_loop = EventType::Sync.blocks_per_loop();
                 }
                 Err(e) => {
-                    println!(" - - Syncing reserves failure from: {:?} to: {:?}", start_block_per_loop.to_string(), end_block_per_loop.to_string());
-                    println!(" - - Cut blocks per loop by half");
+                    println!(" - 2 - Fetching reserve logs failure {:?} from: {:?} to: {:?}, and cut blocks per loop by half", e, start_block_per_loop.to_string(), end_block_per_loop.to_string());
                     println!();
                     blocks_per_loop = blocks_per_loop / 2;
                     continue;
                 }
             }
         }
-        println!("Reserves sync finished");
+        println!("Reserve logs sync finished");
         Ok(true)
     }
 
@@ -245,12 +243,16 @@ impl Assembler {
             reserve_logs.push(log);
         }
 
+        let _count = reserve_logs.len();
+        // number of parameters must be between
         match models::batch_insert_reserve_logs(reserve_logs, conn) {
             Ok(count) => {
-                println!("Update into db count: {:?}", count);
+                println!(" - 3 - Want to insert {:?}, actually storing {:?} reserve logs successfully", _count, count);
+                println!();
             }
             Err(e) => {
-                println!("{}", e);
+                println!(" - 3 - Storing reserve logs {:?} failure: {:?}", e, _count);
+                println!();
             }
         }
     }
