@@ -20,8 +20,8 @@ use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewProtocol, NewReserve};
-use crate::{EventType, NewReserveLog, Protocol};
+use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewProtocol, UpdateReserve, NewReserveLog};
+use crate::{EventType, Protocol};
 use core::str;
 use serde::Serialize;
 
