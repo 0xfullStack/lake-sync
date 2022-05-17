@@ -18,7 +18,6 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
-    // "10749585" to: "10750584"
     pub fn make(node: Node, db_pool: Arc<PgPool>, protocol: Protocol) -> Aggregator {
         let protocol_info = protocol.protocol_info();
         let conn = &db_pool.clone().get().unwrap();

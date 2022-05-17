@@ -113,8 +113,8 @@ impl Protocol {
                     network: "ETHEREUM_MAINNET".to_string(),
                     description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
                     symbol: Some("uniswap-v2".to_string()),
-                    router_address: "7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
-                    factory_address: "5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
+                    router_address: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
+                    factory_address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
                 }
             }
             Protocol::UNISwapV3 => {
