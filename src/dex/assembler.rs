@@ -1,5 +1,5 @@
 use std::env;
-use std::fmt::Display;
+use std::fmt::{Display, format};
 use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
 use std::rc::Rc;
 use std::time::Duration;
@@ -199,17 +199,19 @@ impl Assembler {
             let token0 = ethers::abi::decode(&vec![ParamType::Address], log.topics[1].as_bytes()).unwrap()[0].to_string();
             let token1 = ethers::abi::decode(&vec![ParamType::Address], log.topics[2].as_bytes()).unwrap()[0].to_string();
             let block_number = log.block_number.unwrap().as_u64() as i64;
-            let block_hash = log.block_hash.unwrap_or(H256::zero());
-            let transaction_hash = log.transaction_hash.unwrap_or(H256::zero());
+            let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
+            let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
+            block_hash.retain(|c| c != '\"');
+            transaction_hash.retain(|c| c != '\"');
 
             let pair = NewPair {
-                pair_address,
-                factory_address,
-                token0,
-                token1,
+                pair_address: format!("0x{}", pair_address),
+                factory_address: format!("0x{}", factory_address),
+                token0: format!("0x{}", token0),
+                token1: format!("0x{}", token1),
                 block_number,
-                block_hash: serde_json::to_string(&block_hash).unwrap(),
-                transaction_hash: serde_json::to_string_pretty(&transaction_hash).unwrap(),
+                block_hash,
+                transaction_hash,
                 reserve0: "".to_string(),
                 reserve1: "".to_string(),
             };
@@ -231,18 +233,20 @@ impl Assembler {
         for log in logs {
             let data = &log.data.to_vec();
             let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
-            let pair_address = log.address.into_token().to_string();
+            let pair_address = format!("0x{}", log.address.into_token().to_string());
             let block_number = log.block_number.unwrap().as_u64() as i64;
-            let block_hash = log.block_hash.unwrap_or(H256::zero());
-            let transaction_hash = log.transaction_hash.unwrap_or(H256::zero());
+            let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
+            let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
+            block_hash.retain(|c| c != '\"');
+            transaction_hash.retain(|c| c != '\"');
 
             let log = NewReserveLog {
                 pair_address,
                 block_number,
                 reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
                 reserve1: parameters[1].clone().into_uint().unwrap().to_string(),
-                block_hash: serde_json::to_string(&block_hash).unwrap(),
-                transaction_hash: serde_json::to_string_pretty(&transaction_hash).unwrap(),
+                block_hash,
+                transaction_hash,
             };
             reserve_logs.push(log);
         }

@@ -89,7 +89,7 @@ impl Protocol {
                 U64::from(10000835)
             },
             Protocol::UNISwapV2 => {
-                U64::from(10534585)
+                U64::from(10000835)
             }
             Protocol::UNISwapV3 => {
                 U64::from(10000835)
