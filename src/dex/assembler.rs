@@ -196,7 +196,10 @@ impl Assembler {
             match result {
                 Ok(logs_) => {
                     println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), start_block_per_loop.to_string(), end_block_per_loop.to_string());
-                    self.syncing_into_db(logs_);
+
+                    if logs_.len() > 0 {
+                        self.syncing_into_db(logs_);
+                    }
 
                     // last loop flag
                     if meet_last_loop {
@@ -259,7 +262,7 @@ impl Assembler {
         // number of parameters must be between
         match models::batch_insert_reserve_logs(reserve_logs, conn) {
             Ok(count) => {
-                println!(" - 3 - Want to insert {:?}, actually storing {:?} reserve logs successfully", _count, count);
+                println!(" - 3 - Want to insert => actually storing: {:?} -> {:?}, reserve logs successfully", _count, count);
                 println!();
             }
             Err(e) => {

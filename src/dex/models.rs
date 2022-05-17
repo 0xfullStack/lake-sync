@@ -3,8 +3,9 @@ use diesel::prelude::*;
 use diesel::{sql_query, table};
 use ethers::core::rand::seq::index::IndexVec::USize;
 use crate::db::schema::{Protocol, Pair, ReserveLog};
-use crate::db::schema::Pair::{ pair_address, reserve0, reserve1, block_number };
+use crate::db::schema::Pair::{pair_address, reserve0, reserve1, block_number, star};
 use crate::U64;
+use field_count::FieldCount;
 
 #[derive(Insertable, Debug)]
 #[table_name="Protocol"]
@@ -32,7 +33,7 @@ pub struct NewPair {
     pub reserve1: String
 }
 
-#[derive(Insertable, Debug)]
+#[derive(Insertable, Debug, FieldCount)]
 #[table_name="ReserveLog"]
 pub struct NewReserveLog {
     pub pair_address: String,
@@ -55,25 +56,52 @@ pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResu
         .execute(conn)
 }
 
+pub fn insert_reserve_logs(logs: &[NewReserveLog], conn: &PgConnection) -> QueryResult<usize> {
+    diesel::insert_into(ReserveLog::table)
+        .values(logs)
+        .execute(conn)
+}
+
+const MAX_POSTGRESQL_INSERT_LIMIT: usize = 65535;
 pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) -> QueryResult<usize> {
 
-    let parameter_count = 6;
-    let mut count = logs.len() * parameter_count;
+    let field_count = NewReserveLog::field_count();
+    let element_len = logs.len();
 
-    if count >= 65535 {
-        let from = logs.len()/2;
-        diesel::insert_into(ReserveLog::table)
-            .values(&logs[..from])
-            .execute(conn);
+    if element_len * field_count >= MAX_POSTGRESQL_INSERT_LIMIT {
 
-        let to = (logs.len()/2)+1;
-        diesel::insert_into(ReserveLog::table)
-            .values(&logs[to..])
-            .execute(conn)
+        let mut total_insert: usize = 0;
+        let mut start_index: usize = 0;
+        let mut end_index: usize;
+        let mut count_per_loop: usize = element_len;
+        let mut meet_last_loop = false;
+
+        while count_per_loop * field_count >= MAX_POSTGRESQL_INSERT_LIMIT {
+            count_per_loop = count_per_loop / 2;
+        }
+
+        end_index = start_index + count_per_loop;
+        while !meet_last_loop {
+
+            let count = insert_reserve_logs(&logs[start_index..end_index], conn).unwrap_or(0);
+            total_insert.add_assign(count);
+
+            if end_index + count_per_loop >= element_len {
+                meet_last_loop = true;
+                start_index = end_index;
+                end_index = element_len;
+            } else {
+                start_index = end_index;
+                end_index = start_index + count_per_loop;
+            }
+        }
+
+        let count = insert_reserve_logs(&logs[start_index..end_index], conn).unwrap_or(0);
+        total_insert.add_assign(count);
+        Ok(total_insert)
     } else {
-        diesel::insert_into(ReserveLog::table)
-            .values(&logs)
-            .execute(conn)
+        let count = insert_reserve_logs(&logs, conn).unwrap_or(0);
+        Ok(count)
     }
 }
 
