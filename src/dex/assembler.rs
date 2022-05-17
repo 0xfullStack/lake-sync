@@ -20,7 +20,7 @@ use ethers::types::{U64, Address};
 use ethers::providers::HttpClientError;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{get_last_pair_block_height, NewPair, NewProtocol, NewReserve};
+use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewProtocol, NewReserve};
 use crate::{EventType, NewReserveLog, Protocol};
 use core::str;
 use serde::Serialize;
@@ -55,18 +55,17 @@ impl Assembler {
     pub async fn polling_pairs(&self) -> std::io::Result<bool> {
         let conn = &self.pool.get().unwrap();
         let blocks_per_loop = EventType::PairCreated.blocks_per_loop();
+        let latest_block = U64::from(get_last_pair_block_height(conn).unwrap_or(0));
+        let standar_block_number = self.protocol.star_block_number();
 
-        let latest_block_in_table = get_last_pair_block_height(conn).unwrap_or(0);
-        let latest_block = U64::from(latest_block_in_table);
         let mut start_block_number: U64;
-        if latest_block > self.protocol.star_block_number() {
+        if latest_block > standar_block_number {
             start_block_number = latest_block;
         } else {
-            start_block_number = self.protocol.star_block_number();
+            start_block_number = standar_block_number;
         }
 
         let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
-
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
         let mut blocks_remain = initialize_blocks_remain;
         let mut meet_last_loop = false;
@@ -162,7 +161,15 @@ impl Assembler {
 
     pub async fn polling_reserve_logs(&self) -> std::io::Result<bool> {
         let mut blocks_per_loop = EventType::Sync.blocks_per_loop();
-        let start_block_number: U64 = self.protocol.star_block_number();
+        let standar_block_number = self.protocol.star_block_number();
+        let latest_block = U64::from(get_last_reserve_log_block_height(conn).unwrap_or(0));
+
+        let mut start_block_number: U64;
+        if latest_block > standar_block_number {
+            start_block_number = latest_block;
+        } else {
+            start_block_number = standar_block_number;
+        }
         let latest_block_number: U64 = self.client.get_block_number().await.unwrap();
 
         let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
@@ -212,11 +219,6 @@ impl Assembler {
                     blocks_per_loop = EventType::Sync.blocks_per_loop();
                 }
                 Err(e) => {
-                    // code: -32602, message: "Log response size exceeded.
-                    // You can make eth_getLogs requests with up to a 2K block range and no limit on the response size,
-                    // or you can request any block range with a cap of 10K logs in the response. Based on your parameters and the response size limit,
-                    // this block range should work: [0xa0beb9, 0xa0c2f5]", data: None }))
-
                     println!(" - 2 - Fetching reserve logs failure from: {:?} to: {:?}, error: {:?}, cut by half", start_block_per_loop.to_string(), end_block_per_loop.to_string(), e);
                     println!();
                     blocks_per_loop = blocks_per_loop / 2;
@@ -271,18 +273,4 @@ impl Assembler {
             }
         }
     }
-
-    // fn load_eligible_addresses(&self, to: i64) -> Vec<Address> {
-    //     let from = self.protocol.star_block_number().as_u64() as i64;
-    //     let conn = &self.pool.get().unwrap();
-    //     let addresses_from_db = get_addresses(conn, from, to).unwrap();
-    //     println!("eligible_addresses: {}", addresses_from_db.len());
-    //
-    //     addresses_from_db
-    //         .iter()
-    //         .map(|address| {
-    //             Address::from_str(address.as_str()).unwrap()
-    //         })
-    //         .collect()
-    // }
 }

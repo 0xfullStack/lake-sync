@@ -3,7 +3,8 @@ use diesel::prelude::*;
 use diesel::{sql_query, table};
 use ethers::core::rand::seq::index::IndexVec::USize;
 use crate::db::schema::{Protocol, Pair, ReserveLog};
-use crate::db::schema::Pair::{pair_address, reserve0, reserve1, block_number, star};
+use crate::db::schema::Pair::{pair_address, reserve0, reserve1, block_number};
+use crate::db::schema::ReserveLog::{block_number as reserveLog_block_number};
 use crate::U64;
 use field_count::FieldCount;
 
@@ -109,6 +110,13 @@ pub fn get_last_pair_block_height(conn: &PgConnection) -> QueryResult<i64> {
     Pair::table
         .select(block_number)
         .order_by(block_number.desc())
+        .first(conn)
+}
+
+pub fn get_last_reserve_log_block_height(conn: &PgConnection) -> QueryResult<i64> {
+    ReserveLog::table
+        .select(reserveLog_block_number)
+        .order_by(reserveLog_block_number.desc())
         .first(conn)
 }
 
