@@ -19,8 +19,8 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
-
-    pub fn make(node: Node, db_pool: Rc<PgPool>, protocol: Protocol) -> Aggregator {
+    // "10749585" to: "10750584"
+    pub fn make(node: Node, db_pool: Arc<PgPool>, protocol: Protocol) -> Aggregator {
         let protocol_info = protocol.protocol_info();
         let conn = &db_pool.clone().get().unwrap();
         add_new_protocol(protocol_info, conn);
@@ -32,16 +32,15 @@ impl Aggregator {
         );
         let subscriber = Subscriber::make(
             node.ws,
-            protocol.clone().factory_address(),
+            protocol.clone(),
             db_pool.clone()
         );
         Aggregator { assembler, subscriber, protocol }
     }
 
     pub async fn start_syncing(&self) {
-
         // self.assembler.polling_pairs().await;
-        self.assembler.polling_reserve_logs().await;
-        // self.subscriber.listening().await;
+        // self.assembler.polling_reserve_logs().await;
+        self.subscriber.start_watching().await;
     }
 }

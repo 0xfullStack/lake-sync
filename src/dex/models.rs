@@ -26,7 +26,7 @@ pub fn add_new_protocol(protocol: NewProtocol, conn: &PgConnection) -> QueryResu
         .execute(conn)
 }
 
-#[derive(Insertable, Debug)]
+#[derive(Insertable, Debug, Clone)]
 #[table_name="Pair"]
 pub struct NewPair {
     pub pair_address: String,
@@ -53,7 +53,7 @@ pub fn get_last_pair_block_height(conn: &PgConnection) -> QueryResult<i64> {
         .first(conn)
 }
 
-#[derive(Insertable, Debug, FieldCount)]
+#[derive(Insertable, FieldCount, Debug, Clone)]
 #[table_name="ReserveLog"]
 pub struct NewReserveLog {
     pub pair_address: String,

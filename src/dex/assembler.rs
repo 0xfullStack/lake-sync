@@ -34,7 +34,7 @@ pub struct Assembler {
     pub node: String,
     pub protocol: Protocol,
     client: Arc<Provider::<Http>>,
-    pool: Rc<PgPool>
+    pool: Arc<PgPool>
 }
 
 struct BlockRange {
@@ -44,7 +44,7 @@ struct BlockRange {
 }
 
 impl Assembler {
-    pub fn make(node: String, protocol: Protocol, pool: Rc<PgPool>) -> Assembler {
+    pub fn make(node: String, protocol: Protocol, pool: Arc<PgPool>) -> Assembler {
         Assembler {
             protocol, pool,
             node: node.clone(),
@@ -248,7 +248,6 @@ impl Assembler {
         }
 
         let _count = reserve_logs.len();
-        // number of parameters must be between
         match models::batch_insert_reserve_logs(reserve_logs, conn) {
             Ok(count) => {
                 println!(" - 3 - Want to insert => actually storing: {:?} -> {:?}, reserve logs successfully", _count, count);
