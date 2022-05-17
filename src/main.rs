@@ -20,7 +20,7 @@ use db::postgres::*;
 use ethers::prelude::U64;
 use ethers::types::{ H256, H160 };
 use crate::dex::aggregator::Aggregator;
-use crate::dex::models::{NewProtocol, NewReserve, NewReserveLog};
+use crate::dex::models::NewProtocol;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -40,14 +40,14 @@ async fn main() -> std::io::Result<()> {
     // Start Service
     let aggregator = Aggregator::make(
         Node { http, ws },
-        Rc::clone(&Rc::new(pool)),
+        Arc::new(pool),
         Protocol::UNISwapV2
     );
 
     // Infinite Loop
     aggregator.start_syncing().await;
 
-    Result::Ok(())
+    Ok(())
 }
 
 pub struct Node {
@@ -89,7 +89,7 @@ impl Protocol {
                 U64::from(10000835)
             },
             Protocol::UNISwapV2 => {
-                U64::from(10000835)
+                U64::from(10534585)
             }
             Protocol::UNISwapV3 => {
                 U64::from(10000835)
@@ -102,10 +102,10 @@ impl Protocol {
             Protocol::SushiSwapV2 => {
                 NewProtocol {
                     name: "Sushiswap Protocol".to_string(),
-                    official_url: Option::Some("".to_string()),
+                    official_url: Some("".to_string()),
                     network: "ETHEREUM_MAINNET".to_string(),
-                    description: Option::Some("".to_string()),
-                    symbol: Option::Some("sushiswap-v2".to_string()),
+                    description: Some("".to_string()),
+                    symbol: Some("sushiswap-v2".to_string()),
                     router_address: "".to_string(),
                     factory_address: "".to_string().to_lowercase()
                 }
@@ -113,10 +113,10 @@ impl Protocol {
             Protocol::UNISwapV2 => {
                 NewProtocol {
                     name: "Uniswap Protocol".to_string(),
-                    official_url: Option::Some("https://uniswap.org/".to_string()),
+                    official_url: Some("https://uniswap.org/".to_string()),
                     network: "ETHEREUM_MAINNET".to_string(),
-                    description: Option::Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
-                    symbol: Option::Some("uniswap-v2".to_string()),
+                    description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
+                    symbol: Some("uniswap-v2".to_string()),
                     router_address: "7a250d5630B4cF539739dF2C5dAcb4c659F2488D".to_string(),
                     factory_address: "5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
                 }
@@ -124,10 +124,10 @@ impl Protocol {
             Protocol::UNISwapV3 => {
                 NewProtocol {
                     name: "Uniswap Protocol".to_string(),
-                    official_url: Option::Some("https://uniswap.org/".to_string()),
+                    official_url: Some("https://uniswap.org/".to_string()),
                     network: "ETHEREUM_MAINNET".to_string(),
-                    description: Option::Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
-                    symbol: Option::Some("uniswap-v3".to_string()),
+                    description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
+                    symbol: Some("uniswap-v3".to_string()),
                     router_address: "".to_string(),
                     factory_address: "".to_string().to_lowercase()
                 }
@@ -154,7 +154,7 @@ impl EventType {
                 U64::from(100_000)
             }
             EventType::Sync => {
-                U64::from(10_000)
+                U64::from(2_000)
             }
         }
     }
