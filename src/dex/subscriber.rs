@@ -1,34 +1,20 @@
-use std::env;
-use std::ops::{Add, Sub, SubAssign};
-use std::rc::Rc;
 use std::sync::Arc;
-use std::str::FromStr;
 use std::time::Duration;
-use diesel::query_dsl::InternalJoinDsl;
-use dotenv::dotenv;
-use ethers::abi::{ParamType, Tokenizable, Tokenize};
+use ethers::abi::{ParamType, Tokenizable};
 
 use tokio;
 use ethers::prelude::*;
-use ethers::contract::Contract;
 use ethers::prelude::ValueOrArray::Value;
-use ethers::types::{U64, Address};
+use ethers::types::U64;
 use crate::db::postgres::PgPool;
-use crate::dex::models::{NewPair, NewProtocol, *};
+use crate::dex::models::{NewPair, *};
 use crate::{EventType, Protocol};
-use crate::dex::models;
 
 #[derive(Clone)]
 pub struct Subscriber {
     pub node: String,
     pub protocol: Protocol,
     pool: Arc<PgPool>
-}
-
-enum SubscriptionError {
-    ConnectionFailed,
-    InvalidEncoding,
-    UnKnown
 }
 
 impl Subscriber {
@@ -66,11 +52,12 @@ impl Subscriber {
             .address(ValueOrArray::Value(self.protocol.factory_address()))
             .topic0(Value(EventType::PairCreated.topic_hash()));
 
-        let mut stream_result = provider.subscribe_logs(&filter).await;
+        let stream_result = provider.subscribe_logs(&filter).await;
         match stream_result {
             Ok(mut stream) => {
                 println!(" - 1 - Subscriber: subscribe pair created success");
-                while let next = stream.next().await {
+                loop {
+                    let next = stream.next().await;
                     match next {
                         Some(log) => {
                             println!(" - 1- Subscriber: receive new pair created logs: {:?}", log);
@@ -101,11 +88,12 @@ impl Subscriber {
             .from_block(block_number)
             .topic0(Value(EventType::Sync.topic_hash()));
 
-        let mut stream_result = provider.subscribe_logs(&filter).await;
+        let stream_result = provider.subscribe_logs(&filter).await;
         match stream_result {
             Ok(mut stream) => {
                 println!(" - 2 - Subscriber: subscribe reserve change success");
-                while let next = stream.next().await {
+                loop {
+                    let next = stream.next().await;
                     match next {
                         Some(log) => {
                             println!(" - 2 - Subscriber: receive new reserve logs: {:?}", log);
@@ -125,7 +113,7 @@ impl Subscriber {
         Ok(false)
     }
 
-    async fn syncing_pair_into_db(&self, log: Log) {
+    fn syncing_pair_into_db(&self, log: Log) {
         let conn = &self.pool.get().unwrap();
 
         let data = &log.data.to_vec();

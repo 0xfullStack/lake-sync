@@ -5,15 +5,11 @@ mod db;
 mod dex;
 mod abi;
 
-use std::{env, thread};
-use std::rc::Rc;
+use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
 use env_logger::Env;
 use dotenv::dotenv;
-use ethers::abi::Address;
-use ethers::prelude::{BlockNumber, U256};
-use ethers::prelude::builders::Event;
 use dex::assembler::Assembler;
 use dex::subscriber::Subscriber;
 use db::postgres::*;

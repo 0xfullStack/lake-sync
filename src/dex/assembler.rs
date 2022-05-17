@@ -1,46 +1,22 @@
-use std::env;
-use std::fmt::{Display, format};
-use std::ops::{Add, AddAssign, Div, Sub, SubAssign};
-use std::rc::Rc;
-use std::time::Duration;
+use std::ops::{Add, Sub, SubAssign};
 use std::sync::Arc;
-use std::str::FromStr;
-
-use tokio;
-use dotenv::dotenv;
 
 use ethers::prelude::*;
 use ethers::abi::Tokenizable;
 use ethers::prelude::ValueOrArray::Value;
-use ethers::contract::Contract;
-use ethers::abi::{ParamType, Tokenize};
-use ethers::abi::Error::Hex;
-use ethers::providers::{JsonRpcClient, Http};
-use ethers::types::{U64, Address};
-use ethers::providers::HttpClientError;
+use ethers::abi::ParamType;
+use ethers::providers::Http;
+use ethers::types::U64;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewProtocol, UpdateReserve, NewReserveLog};
+use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewReserveLog};
 use crate::{EventType, Protocol};
-use core::str;
-use serde::Serialize;
-
-#[derive(Debug)]
-enum AssemblerError {
-    ReachMaxLimit
-}
 
 pub struct Assembler {
     pub node: String,
     pub protocol: Protocol,
     client: Arc<Provider::<Http>>,
     pool: Arc<PgPool>
-}
-
-struct BlockRange {
-    pub from: U64,
-    pub to: U64,
-    pub blocks_per_loop: U64
 }
 
 impl Assembler {
@@ -58,7 +34,7 @@ impl Assembler {
         let latest_block = U64::from(get_last_pair_block_height(conn).unwrap_or(0));
         let standar_block_number = self.protocol.star_block_number();
 
-        let mut start_block_number: U64;
+        let start_block_number: U64;
         if latest_block > standar_block_number {
             start_block_number = latest_block;
         } else {
@@ -74,8 +50,8 @@ impl Assembler {
 
             println!("start");
 
-            let mut start_block_per_loop;
-            let mut end_block_per_loop;
+            let start_block_per_loop;
+            let end_block_per_loop;
 
             if initialize_blocks_remain <= blocks_per_loop {
                 start_block_per_loop = start_block_number;
@@ -123,7 +99,7 @@ impl Assembler {
         let standar_block_number = self.protocol.star_block_number();
         let latest_block = U64::from(get_last_reserve_log_block_height(conn).unwrap_or(0));
 
-        let mut start_block_number: U64;
+        let start_block_number: U64;
         if latest_block > standar_block_number {
             start_block_number = latest_block;
         } else {
@@ -139,8 +115,8 @@ impl Assembler {
 
             println!(" - 1 - Start syncing reserves");
 
-            let mut start_block_per_loop;
-            let mut end_block_per_loop;
+            let start_block_per_loop;
+            let end_block_per_loop;
 
             if initialize_blocks_remain <= blocks_per_loop {
                 start_block_per_loop = start_block_number;
@@ -189,7 +165,7 @@ impl Assembler {
         Ok(true)
     }
 
-    async fn syncing_pairs_into_db(&self, logs: Vec<Log>) {
+    fn syncing_pairs_into_db(&self, logs: Vec<Log>) {
         let conn = &self.pool.get().unwrap();
         let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
         for log in logs {
@@ -218,8 +194,8 @@ impl Assembler {
             pairs.push(pair);
         }
         match models::batch_insert_pairs(pairs, conn) {
-            Ok(_) => {
-                // println!("Success: {:?}", pair);
+            Ok(count) => {
+                println!("Success: {:?}", count);
             }
             Err(e) => {
                 println!("{}", e);

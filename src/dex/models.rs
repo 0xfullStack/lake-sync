@@ -1,11 +1,8 @@
 use std::ops::AddAssign;
 use diesel::prelude::*;
-use diesel::{sql_query, table};
-use ethers::core::rand::seq::index::IndexVec::USize;
 use crate::db::schema::{Protocol, Pair, ReserveLog};
-use crate::db::schema::Pair::{pair_address, reserve0, reserve1, block_number};
+use crate::db::schema::Pair::{pair_address, block_number};
 use crate::db::schema::ReserveLog::{block_number as reserveLog_block_number};
-use crate::U64;
 use field_count::FieldCount;
 
 #[derive(Insertable, Debug)]

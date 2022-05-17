@@ -1,6 +1,5 @@
-use std::rc::Rc;
 use std::sync::Arc;
-use ethers::prelude::{Address, BlockNumber};
+use ethers::prelude::BlockNumber;
 use crate::{Assembler, Node, PgPool, Protocol, Subscriber};
 use crate::dex::models::add_new_protocol;
 
@@ -39,7 +38,7 @@ impl Aggregator {
     }
 
     pub async fn start_syncing(&self) {
-        // self.assembler.polling_pairs().await;
+        self.assembler.polling_pairs().await;
         self.assembler.polling_reserve_logs().await;
         self.subscriber.start_watching().await;
     }
