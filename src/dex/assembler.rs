@@ -94,19 +94,13 @@ impl Assembler {
             println!("{}", start_block_per_loop.to_string());
             println!("{}", end_block_per_loop.to_string());
 
-            let pairs = self.syncing_pairs(
-                BlockNumber::Number(start_block_per_loop),
-                BlockNumber::Number(end_block_per_loop)
-            ).await;
+            let logs = self.fetch_pairs_logs(
+                start_block_per_loop.as_u64() as i64,
+                end_block_per_loop.as_u64() as i64
+            ).await.unwrap();
 
-            match models::batch_insert_pairs(pairs, conn) {
-                Ok(_) => {
-                    // println!("Success: {:?}", pair);
-                }
-                Err(e) => {
-                    println!("{}", e);
-                    break;
-                }
+            if logs.len() > 0 {
+                self.syncing_pairs_into_db(logs);
             }
 
             // last loop flag
@@ -123,43 +117,8 @@ impl Assembler {
         Ok(true)
     }
 
-    async fn syncing_pairs(&self, from: BlockNumber, to: BlockNumber) -> Vec<NewPair> {
-        let filter = Filter::default()
-            .address(ValueOrArray::Value(self.protocol.factory_address()))
-            .topic0(Value(EventType::PairCreated.topic_hash()))
-            .from_block(from)
-            .to_block(to);
-
-        // thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value: JsonRpcClientError(JsonRpcError(JsonRpcError { code: -32005, message: "query timeout exceeded", data: None }))'
-        let logs = self.client.get_logs(&filter).await.unwrap();
-        let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
-        for log in logs {
-            let data = &log.data.to_vec();
-            let factory_address = self.protocol.factory_address().into_token().to_string();
-            let pair_address = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap()[0].to_string();
-            let token0 = ethers::abi::decode(&vec![ParamType::Address], log.topics[1].as_bytes()).unwrap()[0].to_string();
-            let token1 = ethers::abi::decode(&vec![ParamType::Address], log.topics[2].as_bytes()).unwrap()[0].to_string();
-            let block_number = log.block_number.unwrap().as_u64() as i64;
-            let block_hash = log.block_hash.unwrap_or(H256::zero());
-            let transaction_hash = log.transaction_hash.unwrap_or(H256::zero());
-
-            let pair = NewPair {
-                pair_address,
-                factory_address,
-                token0,
-                token1,
-                block_number,
-                block_hash: serde_json::to_string(&block_hash).unwrap(),
-                transaction_hash: serde_json::to_string_pretty(&transaction_hash).unwrap(),
-                reserve0: "".to_string(),
-                reserve1: "".to_string(),
-            };
-            pairs.push(pair);
-        }
-        pairs
-    }
-
     pub async fn polling_reserve_logs(&self) -> std::io::Result<bool> {
+        let conn = &self.pool.get().unwrap();
         let mut blocks_per_loop = EventType::Sync.blocks_per_loop();
         let standar_block_number = self.protocol.star_block_number();
         let latest_block = U64::from(get_last_reserve_log_block_height(conn).unwrap_or(0));
@@ -205,7 +164,7 @@ impl Assembler {
                     println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), start_block_per_loop.to_string(), end_block_per_loop.to_string());
 
                     if logs_.len() > 0 {
-                        self.syncing_into_db(logs_);
+                        self.syncing_reserves_into_db(logs_);
                     }
 
                     // last loop flag
@@ -230,15 +189,43 @@ impl Assembler {
         Ok(true)
     }
 
-    async fn fetch_reserve_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
-        let filter = Filter::default()
-            .topic0(Value(EventType::Sync.topic_hash()))
-            .from_block(BlockNumber::Number(U64::from(from)))
-            .to_block(BlockNumber::Number(U64::from(to)));
-        self.client.get_logs(&filter).await
+    async fn syncing_pairs_into_db(&self, logs: Vec<Log>) {
+        let conn = &self.pool.get().unwrap();
+        let mut pairs: Vec<NewPair> = Vec::with_capacity(logs.len());
+        for log in logs {
+            let data = &log.data.to_vec();
+            let factory_address = self.protocol.factory_address().into_token().to_string();
+            let pair_address = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap()[0].to_string();
+            let token0 = ethers::abi::decode(&vec![ParamType::Address], log.topics[1].as_bytes()).unwrap()[0].to_string();
+            let token1 = ethers::abi::decode(&vec![ParamType::Address], log.topics[2].as_bytes()).unwrap()[0].to_string();
+            let block_number = log.block_number.unwrap().as_u64() as i64;
+            let block_hash = log.block_hash.unwrap_or(H256::zero());
+            let transaction_hash = log.transaction_hash.unwrap_or(H256::zero());
+
+            let pair = NewPair {
+                pair_address,
+                factory_address,
+                token0,
+                token1,
+                block_number,
+                block_hash: serde_json::to_string(&block_hash).unwrap(),
+                transaction_hash: serde_json::to_string_pretty(&transaction_hash).unwrap(),
+                reserve0: "".to_string(),
+                reserve1: "".to_string(),
+            };
+            pairs.push(pair);
+        }
+        match models::batch_insert_pairs(pairs, conn) {
+            Ok(_) => {
+                // println!("Success: {:?}", pair);
+            }
+            Err(e) => {
+                println!("{}", e);
+            }
+        }
     }
 
-    fn syncing_into_db(&self, logs: Vec<Log>) {
+    fn syncing_reserves_into_db(&self, logs: Vec<Log>) {
         let conn = &self.pool.get().unwrap();
         let mut reserve_logs: Vec<NewReserveLog> = Vec::with_capacity(logs.len());
         for log in logs {
@@ -272,5 +259,22 @@ impl Assembler {
                 println!();
             }
         }
+    }
+
+    async fn fetch_pairs_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
+        let filter = Filter::default()
+            .address(ValueOrArray::Value(self.protocol.factory_address()))
+            .topic0(Value(EventType::PairCreated.topic_hash()))
+            .from_block(from)
+            .to_block(to);
+        self.client.get_logs(&filter).await
+    }
+
+    async fn fetch_reserve_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
+        let filter = Filter::default()
+            .topic0(Value(EventType::Sync.topic_hash()))
+            .from_block(BlockNumber::Number(U64::from(from)))
+            .to_block(BlockNumber::Number(U64::from(to)));
+        self.client.get_logs(&filter).await
     }
 }
