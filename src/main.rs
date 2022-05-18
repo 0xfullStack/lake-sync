@@ -30,7 +30,7 @@ async fn main() -> std::io::Result<()> {
     let pool = init_pool(&database_url).expect("Failed to create pool");
 
     // Node
-    let http = (&env::var("ALCHEMY_NODE_HTTP").unwrap()).to_string();
+    let http = (&env::var("CRYPTOLESS_NODE_HTTP").unwrap()).to_string();
     let ws   = (&env::var("ALCHEMY_NODE_WS").unwrap()).to_string();
 
     // Start Service
@@ -150,7 +150,7 @@ impl EventType {
                 U64::from(100_000)
             }
             EventType::Sync => {
-                U64::from(2_000)
+                U64::from(5_000)
             }
         }
     }
