@@ -58,7 +58,7 @@ pub enum Protocol {
     SushiSwapV2
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum EventType {
     PairCreated,
     Sync
@@ -123,7 +123,7 @@ impl Protocol {
                 U64::from(10000835)
             },
             Protocol::UNISwapV2 => {
-                U64::from(12000835)
+                U64::from(10000835)
             }
             Protocol::UNISwapV3 => {
                 U64::from(10000835)

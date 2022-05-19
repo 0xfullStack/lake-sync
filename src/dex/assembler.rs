@@ -67,7 +67,7 @@ impl Assembler {
                                 Ok(logs) => {
                                     println!(" - 2 - Fetching {:?} pair created logs successfully from: {:?} to: {:?}", logs.len(), from, to);
                                     if logs.len() > 0 {
-                                        clone_self.syncing_into_db(logs, EventType::PairCreated);
+                                        clone_self.syncing_into_db(logs, event);
                                     }
                                 }
                                 Err(e) => {
