@@ -41,7 +41,7 @@ impl Assembler {
         let total_range = self.get_total_block_range(event).await;
         let mut blocks_remain = total_range.size;
         let mut meet_last_loop = false;
-        let mut blocks_per_loop = event.blocks_per_loop();
+        let blocks_per_loop = event.blocks_per_loop();
 
         while blocks_remain > U64::zero() {
 
@@ -118,7 +118,7 @@ impl Assembler {
         }
     }
 
-    pub async fn polling_reserve_logs(&self, from: U64, to: U64) {
+    async fn polling_reserve_logs(&self, from: U64, to: U64) {
         let result = self.fetch_reserve_logs(from, to).await;
 
         match result {
