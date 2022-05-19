@@ -21,8 +21,7 @@ pub struct Assembler {
     pool: Arc<PgPool>
 }
 
-const MAX_CONCURRENCY_THREAD: i64 = 25;
-
+#[derive(Clone, Copy)]
 pub struct BlockRange {
     pub from: U64,
     pub to: U64,
@@ -39,48 +38,43 @@ impl Assembler {
     }
 
     pub async fn polling(&self, event: EventType) {
-        let range = self.get_standard_block_range(EventType::Sync).await;
-        let mut blocks_remain = range.size;
+        let total_range = self.get_total_block_range(EventType::Sync).await;
+        let mut blocks_remain = total_range.size;
         let mut meet_last_loop = false;
-        let mut blocks_per_loop = EventType::Sync.blocks_per_loop();
+        let mut blocks_per_loop = event.blocks_per_loop();
 
         while blocks_remain > U64::zero() {
 
-            let start_block_per_loop;
-            let end_block_per_loop;
-
-            if range.size <= blocks_per_loop {
-                start_block_per_loop = range.from;
-                end_block_per_loop = range.to;
-            } else {
-                start_block_per_loop = range.from.add(range.size.sub(blocks_remain));
-                if meet_last_loop {
-                    end_block_per_loop = start_block_per_loop.add(blocks_remain).sub(1);
-                } else {
-                    end_block_per_loop = start_block_per_loop.add(blocks_per_loop).sub(1);
-                }
-            }
-
+            let range_per_loop = Assembler::get_block_range_per_loop(total_range, blocks_per_loop, meet_last_loop, blocks_remain);
+            let from = range_per_loop.from;
+            let to = range_per_loop.to;
             match event {
                 EventType::PairCreated => {
-                    let logs = self.fetch_pairs_logs(
-                        start_block_per_loop.as_u64() as i64,
-                        end_block_per_loop.as_u64() as i64
-                    ).await.unwrap();
-
-                    if logs.len() > 0 {
-                        self.syncing_into_db(logs, EventType::PairCreated);
-                    }
-                }
-                EventType::Sync => {
+                    println!(" - - Pair created logs syncing from: {:?} to: {:?}", from, to);
                     let mut tasks = Vec::new();
-                    let range_per_loop = blocks_per_loop.div(MAX_CONCURRENCY_THREAD);
-                    for index in 0..MAX_CONCURRENCY_THREAD {
+                    let thread_count = event.max_threads_count().as_u32();
+                    let range_per_loop = blocks_per_loop.div(thread_count);
+                    for index in 0..thread_count {
                         let clone_self = self.clone();
                         let task = tokio::spawn(async move {
-                            let from = start_block_per_loop.add(range_per_loop.mul(index));
+                            let from = from.add(range_per_loop.mul(index));
                             let to= from.add(range_per_loop).sub(1);
-                            clone_self.polling_reserve_logs(from, to, range_per_loop).await;
+
+                            println!(" - 1 - Start pair created logs syncing from: {:?} to: {:?}", from, to);
+                            let result = clone_self.fetch_pairs_logs(from, to).await;
+
+                            match result {
+                                Ok(logs) => {
+                                    println!(" - 2 - Fetching {:?} pair created logs successfully from: {:?} to: {:?}", logs.len(), from, to);
+                                    if logs.len() > 0 {
+                                        clone_self.syncing_into_db(logs, EventType::PairCreated);
+                                    }
+                                }
+                                Err(e) => {
+                                    println!(" - 2 - Fetching pair created logs failure from: {:?} to: {:?}, error: {:?}, cut by half", from, to, e);
+                                    println!();
+                                }
+                            }
                         });
                         tasks.push(task);
                     }
@@ -88,9 +82,29 @@ impl Assembler {
                     for task in tasks {
                         task.await;
                     }
-
-                    println!("- - Reserve logs sync from {:?} to {:?} finished", start_block_per_loop, end_block_per_loop);
+                    println!("- - Pair created logs sync from {:?} to {:?} finished", from, to);
                     println!();
+                }
+                EventType::Sync => {
+                    // let mut tasks = Vec::new();
+                    // let thread_count = event.max_threads_count().as_u32();
+                    // let range_per_loop = blocks_per_loop.div(thread_count);
+                    // for index in 0..thread_count {
+                    //     let clone_self = self.clone();
+                    //     let task = tokio::spawn(async move {
+                    //         let from = from.add(range_per_loop.mul(index));
+                    //         let to= from.add(range_per_loop).sub(1);
+                    //         clone_self.polling_reserve_logs(from, to).await;
+                    //     });
+                    //     tasks.push(task);
+                    // }
+                    //
+                    // for task in tasks {
+                    //     task.await;
+                    // }
+                    //
+                    // println!("- - Reserve logs sync from {:?} to {:?} finished", from, to);
+                    // println!();
                 }
             }
 
@@ -104,65 +118,20 @@ impl Assembler {
         }
     }
 
-    pub async fn polling_reserve_logs(&self, from: U64, to: U64, blocks_per_loop: U64) -> std::io::Result<bool> {
-        let mut blocks_per_loop= blocks_per_loop;
-        let start_block_number = from;
-        let latest_block_number = to;
+    pub async fn polling_reserve_logs(&self, from: U64, to: U64) {
+        let result = self.fetch_reserve_logs(from, to).await;
 
-        let initialize_blocks_remain = latest_block_number.sub(start_block_number).add(1);
-        let mut blocks_remain = initialize_blocks_remain;
-        let mut meet_last_loop = false;
-
-        println!(" - 1 - Start syncing reserves from {:?} to {:?}", from, to);
-
-        while blocks_remain > U64::zero() {
-
-            let start_block_per_loop;
-            let end_block_per_loop;
-
-            if initialize_blocks_remain <= blocks_per_loop {
-                start_block_per_loop = start_block_number;
-                end_block_per_loop = latest_block_number;
-            } else {
-                start_block_per_loop = start_block_number.add(initialize_blocks_remain.sub(blocks_remain));
-                if meet_last_loop {
-                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_remain);
-                } else {
-                    end_block_per_loop = start_block_per_loop.sub(1).add(blocks_per_loop);
+        match result {
+            Ok(logs_) => {
+                println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), from.to_string(), to.to_string());
+                if logs_.len() > 0 {
+                    self.syncing_into_db(logs_, EventType::Sync);
                 }
             }
-
-            let result = self.fetch_reserve_logs(
-                start_block_per_loop.as_u64() as i64,
-                end_block_per_loop.as_u64() as i64
-            ).await;
-
-            match result {
-                Ok(logs_) => {
-                    println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), start_block_per_loop.to_string(), end_block_per_loop.to_string());
-
-                    if logs_.len() > 0 {
-                        self.syncing_into_db(logs_, EventType::Sync);
-                    }
-
-                    // last loop flag
-                    if meet_last_loop {
-                        break;
-                    }
-                    if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
-                        meet_last_loop = true;
-                    }
-                    blocks_remain.sub_assign(blocks_per_loop);
-                    blocks_per_loop = EventType::Sync.blocks_per_loop();
-                }
-                Err(e) => {
-                    println!(" - 2 - Fetching reserve logs failure from: {:?} to: {:?}, error: {:?}, cut by half", start_block_per_loop.to_string(), end_block_per_loop.to_string(), e);
-                    blocks_per_loop = blocks_per_loop / 2;
-                    continue;
-                }
+            Err(e) => {
+                println!(" - 2 - Fetching reserve logs failure from: {:?} to: {:?}, error: {:?}, cut by half", from.to_string(), to.to_string(), e);
             }
         }
-        Ok(true)
     }
 
     fn syncing_into_db(&self, logs: Vec<Log>, event: EventType) {
@@ -196,24 +165,24 @@ impl Assembler {
         }
     }
 
-    async fn fetch_pairs_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
+    async fn fetch_pairs_logs(&self, from: U64, to: U64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
             .address(ValueOrArray::Value(self.protocol.factory_address()))
             .topic0(Value(EventType::PairCreated.topic_hash()))
-            .from_block(from)
-            .to_block(to);
+            .from_block(BlockNumber::Number(from))
+            .to_block(BlockNumber::Number(to));
         self.client.get_logs(&filter).await
     }
 
-    async fn fetch_reserve_logs(&self, from: i64, to: i64) -> Result<Vec<Log>, ProviderError> {
+    async fn fetch_reserve_logs(&self, from: U64, to: U64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
             .topic0(Value(EventType::Sync.topic_hash()))
-            .from_block(BlockNumber::Number(U64::from(from)))
-            .to_block(BlockNumber::Number(U64::from(to)));
+            .from_block(BlockNumber::Number(from))
+            .to_block(BlockNumber::Number(to));
         self.client.get_logs(&filter).await
     }
 
-    async fn get_standard_block_range(&self, event: EventType) -> BlockRange {
+    async fn get_total_block_range(&self, event: EventType) -> BlockRange {
         let created_at_block_number = self.protocol.created_at_block_number();
         let current_synced_block_number = self.get_event_block_height_in_db(event);
         let mut from = created_at_block_number;
@@ -223,6 +192,26 @@ impl Assembler {
         let to: U64 = self.client.get_block_number().await.unwrap();
         let size = to.sub(from).add(1);
 
+        BlockRange { from, to, size }
+    }
+
+    fn get_block_range_per_loop(total_range: BlockRange, blocks_per_loop: U64, meet_last_loop: bool, blocks_remain: U64) -> BlockRange {
+        let from;
+        let to;
+
+        if total_range.size <= blocks_per_loop {
+            from = total_range.from;
+            to = total_range.to;
+        } else {
+            from = total_range.from.add(total_range.size.sub(blocks_remain));
+            if meet_last_loop {
+                to = from.add(blocks_remain).sub(1);
+            } else {
+                to = from.add(blocks_per_loop).sub(1);
+            }
+        }
+
+        let size = to.sub(from).add(1);
         BlockRange { from, to, size }
     }
 

@@ -147,10 +147,21 @@ impl EventType {
     fn blocks_per_loop(&self) -> U64 {
         match self {
             EventType::PairCreated => {
-                U64::from(100_000)
+                U64::from(1000_000)
             }
             EventType::Sync => {
                 U64::from(5_000)
+            }
+        }
+    }
+
+    fn max_threads_count(&self) -> U64 {
+        match self {
+            EventType::PairCreated => {
+                U64::from(10)
+            }
+            EventType::Sync => {
+                U64::from(25)
             }
         }
     }
