@@ -38,7 +38,7 @@ impl Assembler {
     }
 
     pub async fn polling(&self, event: EventType) {
-        let total_range = self.get_total_block_range(EventType::Sync).await;
+        let total_range = self.get_total_block_range(event).await;
         let mut blocks_remain = total_range.size;
         let mut meet_last_loop = false;
         let mut blocks_per_loop = event.blocks_per_loop();

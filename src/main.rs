@@ -79,20 +79,6 @@ impl Protocol {
         }
     }
 
-    fn created_at_block_number(&self) -> U64 {
-        match self {
-            Protocol::SushiSwapV2 => {
-                U64::from(10000835)
-            },
-            Protocol::UNISwapV2 => {
-                U64::from(10000835)
-            }
-            Protocol::UNISwapV3 => {
-                U64::from(10000835)
-            }
-        }
-    }
-
     fn protocol_info(&self) -> NewProtocol {
         match self {
             Protocol::SushiSwapV2 => {
@@ -127,6 +113,20 @@ impl Protocol {
                     router_address: "".to_string(),
                     factory_address: "".to_string().to_lowercase()
                 }
+            }
+        }
+    }
+
+    fn created_at_block_number(&self) -> U64 {
+        match self {
+            Protocol::SushiSwapV2 => {
+                U64::from(10000835)
+            },
+            Protocol::UNISwapV2 => {
+                U64::from(12000835)
+            }
+            Protocol::UNISwapV3 => {
+                U64::from(10000835)
             }
         }
     }
