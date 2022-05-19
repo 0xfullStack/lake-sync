@@ -30,7 +30,7 @@ async fn main() -> std::io::Result<()> {
     let pool = init_pool(&database_url).expect("Failed to create pool");
 
     // Node
-    let http = (&env::var("CRYPTOLESS_NODE_HTTP").unwrap()).to_string();
+    let http = (&env::var("INFURA_NODE_HTTP").unwrap()).to_string();
     let ws   = (&env::var("ALCHEMY_NODE_WS").unwrap()).to_string();
 
     // Start Service
@@ -79,7 +79,7 @@ impl Protocol {
         }
     }
 
-    fn star_block_number(&self) -> U64 {
+    fn created_at_block_number(&self) -> U64 {
         match self {
             Protocol::SushiSwapV2 => {
                 U64::from(10000835)

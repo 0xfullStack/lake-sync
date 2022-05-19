@@ -37,9 +37,8 @@ impl Aggregator {
     }
 
     pub async fn start_syncing(&self) {
-        self.assembler.polling_pairs().await;
-        self.assembler.polling_reserve_logs_by_multi_thread().await;
-        // self.assembler.polling_reserve_logs().await;
+        self.assembler.polling_pair_created_event().await;
+        self.assembler.polling_sync_event_by_multi_thread().await;
         // self.subscriber.start_watching().await;
     }
 }
