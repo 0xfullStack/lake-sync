@@ -44,68 +44,25 @@ impl Assembler {
         let blocks_per_loop = event.blocks_per_loop();
 
         while blocks_remain > U64::zero() {
-
             let range_per_loop = Assembler::get_block_range_per_loop(total_range, blocks_per_loop, meet_last_loop, blocks_remain);
             let from = range_per_loop.from;
             let to = range_per_loop.to;
-            match event {
-                EventType::PairCreated => {
-                    println!(" - - Pair created logs syncing from: {:?} to: {:?}", from, to);
-                    let mut tasks = Vec::new();
-                    let thread_count = event.max_threads_count().as_u32();
-                    let range_per_loop = blocks_per_loop.div(thread_count);
-                    for index in 0..thread_count {
-                        let clone_self = self.clone();
-                        let task = tokio::spawn(async move {
-                            let from = from.add(range_per_loop.mul(index));
-                            let to= from.add(range_per_loop).sub(1);
+            let thread_count = event.max_threads_count().as_u32();
+            let range_per_thread = blocks_per_loop.div(thread_count);
+            let mut tasks = Vec::new();
 
-                            println!(" - 1 - Start pair created logs syncing from: {:?} to: {:?}", from, to);
-                            let result = clone_self.fetch_pairs_logs(from, to).await;
+            for index in 0..thread_count {
+                let clone_self = self.clone();
+                let from = from.add(range_per_thread.mul(index));
+                let to= from.add(range_per_thread).sub(1);
+                let task = tokio::spawn(async move {
+                    clone_self.handle_task(from, to, event).await;
+                });
+                tasks.push(task);
+            }
 
-                            match result {
-                                Ok(logs) => {
-                                    println!(" - 2 - Fetching {:?} pair created logs successfully from: {:?} to: {:?}", logs.len(), from, to);
-                                    if logs.len() > 0 {
-                                        clone_self.syncing_into_db(logs, event);
-                                    }
-                                }
-                                Err(e) => {
-                                    println!(" - 2 - Fetching pair created logs failure from: {:?} to: {:?}, error: {:?}, cut by half", from, to, e);
-                                    println!();
-                                }
-                            }
-                        });
-                        tasks.push(task);
-                    }
-
-                    for task in tasks {
-                        task.await;
-                    }
-                    println!("- - Pair created logs sync from {:?} to {:?} finished", from, to);
-                    println!();
-                }
-                EventType::Sync => {
-                    // let mut tasks = Vec::new();
-                    // let thread_count = event.max_threads_count().as_u32();
-                    // let range_per_loop = blocks_per_loop.div(thread_count);
-                    // for index in 0..thread_count {
-                    //     let clone_self = self.clone();
-                    //     let task = tokio::spawn(async move {
-                    //         let from = from.add(range_per_loop.mul(index));
-                    //         let to= from.add(range_per_loop).sub(1);
-                    //         clone_self.polling_reserve_logs(from, to).await;
-                    //     });
-                    //     tasks.push(task);
-                    // }
-                    //
-                    // for task in tasks {
-                    //     task.await;
-                    // }
-                    //
-                    // println!("- - Reserve logs sync from {:?} to {:?} finished", from, to);
-                    // println!();
-                }
+            for task in tasks {
+                task.await;
             }
 
             if meet_last_loop {
@@ -115,21 +72,34 @@ impl Assembler {
                 meet_last_loop = true;
             }
             blocks_remain.sub_assign(blocks_per_loop);
+
+            println!("- - {:?} Logs sync from {:?} to {:?} finished", event, from, to);
+            println!();
         }
     }
 
-    async fn polling_reserve_logs(&self, from: U64, to: U64) {
-        let result = self.fetch_reserve_logs(from, to).await;
+    async fn handle_task(&self, from: U64, to: U64, event: EventType) {
+        let result;
+        match event {
+            EventType::PairCreated => {
+                println!(" - 1 - Start {:?} logs syncing from: {:?} to: {:?}", event, from, to);
+                result = self.fetch_pairs_logs(from, to).await;
+            }
+            EventType::Sync => {
+                println!(" - 1 - Start {:?} logs syncing from: {:?} to: {:?}", event, from, to);
+                result = self.fetch_reserve_logs(from, to).await;
+            }
+        }
 
         match result {
-            Ok(logs_) => {
-                println!(" - 2 - Fetching {:?} reserve logs successfully from: {:?} to: {:?}", logs_.len(), from.to_string(), to.to_string());
-                if logs_.len() > 0 {
-                    self.syncing_into_db(logs_, EventType::Sync);
+            Ok(logs) => {
+                println!(" - 2 - Fetching {:?} {:?} logs successfully from: {:?} to: {:?}", event, logs.len(), from, to);
+                if logs.len() > 0 {
+                    self.syncing_into_db(logs, event);
                 }
             }
             Err(e) => {
-                println!(" - 2 - Fetching reserve logs failure from: {:?} to: {:?}, error: {:?}, cut by half", from.to_string(), to.to_string(), e);
+                println!(" - 2 - Fetching {:?} logs failure from: {:?} to: {:?}, error: {:?}, cut by half", event, from, to, e);
             }
         }
     }
@@ -157,10 +127,10 @@ impl Assembler {
         }
         match result {
             Ok(count) => {
-                println!(" - 3 - Insert {:?} records successfully", count);
+                println!(" - 3 - Insert {:?} {:?} records successfully", event, count);
             }
             Err(e) => {
-                println!(" - 3 - Insert {:?} records failure: {:?}", len, e);
+                println!(" - 3 - Insert {:?} {:?} records failure: {:?}", len, event, e);
             }
         }
     }
