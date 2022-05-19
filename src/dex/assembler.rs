@@ -38,60 +38,7 @@ impl Assembler {
         }
     }
 
-    pub async fn polling_pair_created_event(&self) -> std::io::Result<bool> {
-        let range = self.get_standard_block_range(EventType::Sync).await;
-        let mut blocks_remain = range.size;
-        let mut meet_last_loop = false;
-        let blocks_per_loop = EventType::PairCreated.blocks_per_loop();
-
-        while blocks_remain > U64::zero() {
-
-            println!("start");
-
-            let start_block_per_loop;
-            let end_block_per_loop;
-
-            if range.size <= blocks_per_loop {
-                start_block_per_loop = range.from;
-                end_block_per_loop = range.to;
-                meet_last_loop = true;
-            } else {
-                // Calculate start end block
-                start_block_per_loop = range.from.add(range.size.sub(blocks_remain));
-                if meet_last_loop {
-                    end_block_per_loop = start_block_per_loop.add(blocks_remain).sub(1);
-                } else {
-                    end_block_per_loop = start_block_per_loop.add(blocks_per_loop).sub(1);
-                }
-            }
-
-            println!("{}", start_block_per_loop.to_string());
-            println!("{}", end_block_per_loop.to_string());
-
-            let logs = self.fetch_pairs_logs(
-                start_block_per_loop.as_u64() as i64,
-                end_block_per_loop.as_u64() as i64
-            ).await.unwrap();
-
-            if logs.len() > 0 {
-                self.syncing_into_db(logs, EventType::PairCreated);
-            }
-
-            // last loop flag
-            if meet_last_loop {
-                break;
-            }
-            if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
-                meet_last_loop = true;
-            }
-            blocks_remain.sub_assign(blocks_per_loop);
-        }
-
-        println!("Pair sync finished");
-        Ok(true)
-    }
-
-    pub async fn polling_sync_event_by_multi_thread(&self) {
+    pub async fn polling(&self, event: EventType) {
         let range = self.get_standard_block_range(EventType::Sync).await;
         let mut blocks_remain = range.size;
         let mut meet_last_loop = false;
@@ -114,24 +61,38 @@ impl Assembler {
                 }
             }
 
-            let mut tasks = Vec::new();
-            let range_per_loop = blocks_per_loop.div(MAX_CONCURRENCY_THREAD);
-            for index in 0..MAX_CONCURRENCY_THREAD {
-                let clone_self = self.clone();
-                let task = tokio::spawn(async move {
-                    let from = start_block_per_loop.add(range_per_loop.mul(index));
-                    let to= from.add(range_per_loop).sub(1);
-                    clone_self.polling_reserve_logs(from, to, range_per_loop).await;
-                });
-                tasks.push(task);
-            }
+            match event {
+                EventType::PairCreated => {
+                    let logs = self.fetch_pairs_logs(
+                        start_block_per_loop.as_u64() as i64,
+                        end_block_per_loop.as_u64() as i64
+                    ).await.unwrap();
 
-            for task in tasks {
-                task.await;
-            }
+                    if logs.len() > 0 {
+                        self.syncing_into_db(logs, EventType::PairCreated);
+                    }
+                }
+                EventType::Sync => {
+                    let mut tasks = Vec::new();
+                    let range_per_loop = blocks_per_loop.div(MAX_CONCURRENCY_THREAD);
+                    for index in 0..MAX_CONCURRENCY_THREAD {
+                        let clone_self = self.clone();
+                        let task = tokio::spawn(async move {
+                            let from = start_block_per_loop.add(range_per_loop.mul(index));
+                            let to= from.add(range_per_loop).sub(1);
+                            clone_self.polling_reserve_logs(from, to, range_per_loop).await;
+                        });
+                        tasks.push(task);
+                    }
 
-            println!("- - Reserve logs sync from {:?} to {:?} finished", start_block_per_loop, end_block_per_loop);
-            println!();
+                    for task in tasks {
+                        task.await;
+                    }
+
+                    println!("- - Reserve logs sync from {:?} to {:?} finished", start_block_per_loop, end_block_per_loop);
+                    println!();
+                }
+            }
 
             if meet_last_loop {
                 break;

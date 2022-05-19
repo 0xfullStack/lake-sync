@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ethers::prelude::BlockNumber;
-use crate::{Assembler, Node, PgPool, Protocol, Subscriber};
+use crate::{Assembler, EventType, Node, PgPool, Protocol, Subscriber};
 use crate::dex::models::add_new_protocol;
 
 #[derive(Debug)]
@@ -37,8 +37,8 @@ impl Aggregator {
     }
 
     pub async fn start_syncing(&self) {
-        self.assembler.polling_pair_created_event().await;
-        self.assembler.polling_sync_event_by_multi_thread().await;
+        self.assembler.polling(EventType::PairCreated).await;
+        self.assembler.polling(EventType::Sync).await;
         // self.subscriber.start_watching().await;
     }
 }
