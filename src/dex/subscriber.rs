@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use diesel::QueryResult;
+use ethers::abi::Tokenizable;
 
 use tokio;
 use ethers::prelude::*;
@@ -61,7 +62,7 @@ impl Subscriber {
                     match next {
                         Some(log) => {
                             println!(" - 1- Subscriber: receive new pair created logs: {:?}", log);
-                            self.syncing_into_db(log, event);
+                            self.syncing_into_db(&log, event);
                         },
                         None => {
                             println!(" - 1 - Subscriber: start subscribe pair created logs");
@@ -83,12 +84,7 @@ impl Subscriber {
 
         let ws = Ws::connect(self.node.clone()).await.unwrap();
         let provider = Provider::new(ws).interval(Duration::from_millis(500));
-        let from = BlockNumber::Number(U64::from(13000835));
-        let to = BlockNumber::Number(U64::from(13200835));
-        let filter = Filter::default()
-            // .from_block(from)
-            // .to_block(to)
-            .topic0(Value(event.topic_hash()));
+        let filter = Filter::default().topic0(Value(event.topic_hash()));
 
         let stream_result = provider.subscribe_logs(&filter).await;
         match stream_result {
@@ -99,7 +95,7 @@ impl Subscriber {
                     match next {
                         Some(log) => {
                             println!(" - 2 - Subscriber: receive new reserve logs: {:?}", log);
-                            self.syncing_into_db(log, event);
+                            self.syncing_into_db(&log, event);
                         },
                         None => {
                             stream.unsubscribe().await;
@@ -115,18 +111,21 @@ impl Subscriber {
         Ok(false)
     }
 
-    fn syncing_into_db(&self, log: Log, event: EventType) {
+    fn syncing_into_db(&self, log: &Log, event: EventType) {
         let conn = &self.pool.get().unwrap();
         let result: QueryResult<usize>;
         match event {
             EventType::PairCreated => {
                 let factory_address = self.protocol.factory_address();
-                let new_pairs = vec![NewPair::construct_by(log, factory_address)];
+                let new_pairs = vec![NewPair::construct_by(&log, factory_address)];
                 result = batch_insert_pairs(new_pairs, conn);
             }
             EventType::Sync => {
                 let new_reserve_logs = vec![NewReserveLog::construct_by(log)];
                 result = batch_insert_reserve_logs(new_reserve_logs, conn);
+
+                let (pair_address, reserve) = NewReserveLog::extract_reserve_info(log);
+                update_pair_reserve(pair_address, reserve, conn);
             }
         }
 
