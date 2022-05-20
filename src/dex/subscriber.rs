@@ -123,15 +123,17 @@ impl Subscriber {
             EventType::Sync => {
                 let new_reserve_logs = vec![NewReserveLog::construct_by(log)];
                 result = batch_insert_reserve_logs(new_reserve_logs, conn);
-
-                let (pair_address, reserve) = NewReserveLog::extract_reserve_info(log);
-                update_pair_reserve(pair_address, reserve, conn);
             }
         }
 
         match result {
             Ok(count) => {
                 println!(" - 3 - Subscriber Insert {:?} records successfully", count);
+                if let EventType::Sync = event {
+                    let (pair_address, reserve) = NewReserveLog::extract_reserve_info(log);
+                    println!(" - 4 - Subscriber Update pair reserve {:?} successfully", reserve);
+                    update_pair_reserve(pair_address, reserve, conn);
+                }
             }
             Err(e) => {
                 println!(" - 3 - Subscriber Insert records failure: {:?}", e);
