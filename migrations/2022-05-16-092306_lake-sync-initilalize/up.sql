@@ -39,6 +39,7 @@ CREATE TABLE "ReserveLog" (
     "block_number" bigint NOT NULL,
     "block_hash" text NOT NULL,
     "transaction_hash" text NOT NULL,
+    "log_index" bigint NOT NULL,
     PRIMARY KEY ("id"),
     CONSTRAINT "reserve_log_id" UNIQUE ("id")
 );

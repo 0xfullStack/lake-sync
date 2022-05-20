@@ -8,6 +8,7 @@ use ethers::prelude::ValueOrArray::Value;
 use ethers::abi::ParamType;
 use ethers::providers::Http;
 use ethers::types::U64;
+use std::option::Option;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
 use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewReserveLog};
@@ -38,41 +39,40 @@ impl Assembler {
     }
 
     pub async fn polling(&self, event: EventType) {
-        let total_range = self.get_total_block_range(event).await;
-        let mut blocks_remain = total_range.size;
-        let mut meet_last_loop = false;
-        let blocks_per_loop = event.blocks_per_loop();
 
-        while blocks_remain > U64::zero() {
-            let range_per_loop = Assembler::get_block_range_per_loop(total_range, blocks_per_loop, meet_last_loop, blocks_remain);
+        let blocks_per_loop = event.blocks_per_loop();
+        let mut meet_last_loop = false;
+        let mut scanned_block_cursor= None;
+        loop {
+            let total_range = self.get_total_block_range(event, scanned_block_cursor).await;
+            if total_range.size == U64::zero() || meet_last_loop {
+                break
+            }
+
+            let range_per_loop = Assembler::get_block_range_per_loop(total_range, blocks_per_loop);
             let from = range_per_loop.from;
             let to = range_per_loop.to;
-            let thread_count = event.max_threads_count().as_u32();
-            let range_per_thread = blocks_per_loop.div(thread_count);
-            let mut tasks = Vec::new();
-
-            for index in 0..thread_count {
-                let clone_self = self.clone();
-                let from = from.add(range_per_thread.mul(index));
-                let to= from.add(range_per_thread).sub(1);
-                let task = tokio::spawn(async move {
-                    clone_self.handle_task(from, to, event).await;
-                });
-                tasks.push(task);
-            }
-
-            for task in tasks {
-                task.await;
-            }
-
-            if meet_last_loop {
-                break;
-            }
-            if blocks_remain.sub(blocks_per_loop) < blocks_per_loop {
+            let mut thread_count = event.max_threads_count().as_u32();
+            let mut blocks_per_thread = blocks_per_loop.div(thread_count);
+            if range_per_loop.size < blocks_per_thread {
+                self.handle_task(from, to, event).await;
                 meet_last_loop = true;
+            } else {
+                let mut tasks = Vec::new();
+                for index in 0..thread_count {
+                    let clone_self = self.clone();
+                    let from = from.add(blocks_per_thread.mul(index));
+                    let to= from.add(blocks_per_thread).sub(1);
+                    let task = tokio::spawn(async move {
+                        clone_self.handle_task(from, to, event).await;
+                    });
+                    tasks.push(task);
+                }
+                for task in tasks {
+                    task.await;
+                }
             }
-            blocks_remain.sub_assign(blocks_per_loop);
-
+            scanned_block_cursor = Some(to);
             println!("- - {:?} Logs sync from {:?} to {:?} finished", event, from, to);
             println!();
         }
@@ -95,7 +95,7 @@ impl Assembler {
             Ok(logs) => {
                 println!(" - 2 - Fetching {:?} {:?} logs successfully from: {:?} to: {:?}", event, logs.len(), from, to);
                 if logs.len() > 0 {
-                    self.syncing_into_db(logs, event);
+                    self.syncing_logs_into_db(logs, event);
                 }
             }
             Err(e) => {
@@ -104,7 +104,7 @@ impl Assembler {
         }
     }
 
-    fn syncing_into_db(&self, logs: Vec<Log>, event: EventType) {
+    fn syncing_logs_into_db(&self, logs: Vec<Log>, event: EventType) {
 
         let conn = &self.pool.get().unwrap();
         let len = logs.len();
@@ -135,6 +135,16 @@ impl Assembler {
         }
     }
 
+    // fn syncing_reserves_into_db(&self) {
+    //     let conn = &self.pool.get().unwrap();
+    //
+    //     get_latest_pair_reserves()
+    //
+    //
+    //
+    //     batch_update_reserves(conn);
+    // }
+
     async fn fetch_pairs_logs(&self, from: U64, to: U64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
             .address(ValueOrArray::Value(self.protocol.factory_address()))
@@ -152,20 +162,31 @@ impl Assembler {
         self.client.get_logs(&filter).await
     }
 
-    async fn get_total_block_range(&self, event: EventType) -> BlockRange {
-        let created_at_block_number = self.protocol.created_at_block_number();
-        let current_synced_block_number = self.get_event_block_height_in_db(event);
-        let mut from = created_at_block_number;
-        if current_synced_block_number > created_at_block_number {
-            from = current_synced_block_number + 1;
+    async fn get_total_block_range(&self, event: EventType, scanned_block_cursor: Option<U64>) -> BlockRange {
+        let coinbase = self.protocol.coinbase();
+        let block_height_in_db = self.get_event_block_height_in_db(event);
+        let mut from = coinbase;
+        if block_height_in_db > coinbase {
+            from = block_height_in_db + 1;
         }
-        let to: U64 = self.client.get_block_number().await.unwrap();
-        let size = to.sub(from).add(1);
+        if let Some(cursor) = scanned_block_cursor {
+            if cursor > block_height_in_db {
+                from = cursor;
+            }
+        }
 
+        let mut to: U64 = self.client.get_block_number().await.unwrap();
+        let size;
+        if from >= to {
+            to = from;
+            size = U64::zero();
+        } else {
+            size = to.sub(from).add(1);
+        }
         BlockRange { from, to, size }
     }
 
-    fn get_block_range_per_loop(total_range: BlockRange, blocks_per_loop: U64, meet_last_loop: bool, blocks_remain: U64) -> BlockRange {
+    fn get_block_range_per_loop(total_range: BlockRange, blocks_per_loop: U64) -> BlockRange {
         let from;
         let to;
 
@@ -173,14 +194,9 @@ impl Assembler {
             from = total_range.from;
             to = total_range.to;
         } else {
-            from = total_range.from.add(total_range.size.sub(blocks_remain));
-            if meet_last_loop {
-                to = from.add(blocks_remain).sub(1);
-            } else {
-                to = from.add(blocks_per_loop).sub(1);
-            }
+            from = total_range.from;
+            to = from.add(blocks_per_loop).sub(1);
         }
-
         let size = to.sub(from).add(1);
         BlockRange { from, to, size }
     }
@@ -232,6 +248,7 @@ impl NewReserveLog {
         let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
         let pair_address = format!("0x{}", log.address.into_token().to_string());
         let block_number = log.block_number.unwrap().as_u64() as i64;
+        let log_index = log.log_index.unwrap().as_u64() as i64;
         let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
         let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
         block_hash.retain(|c| c != '\"');
@@ -243,6 +260,7 @@ impl NewReserveLog {
             reserve0: parameters[0].clone().into_uint().unwrap().to_string(),
             reserve1: parameters[1].clone().into_uint().unwrap().to_string(),
             block_hash,
+            log_index,
             transaction_hash
         }
     }

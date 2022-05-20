@@ -1,8 +1,9 @@
 use std::ops::AddAssign;
 use diesel::prelude::*;
+use diesel::query_dsl::methods::ThenOrderDsl;
 use crate::db::schema::{Protocol, Pair, ReserveLog};
 use crate::db::schema::Pair::{pair_address, block_number};
-use crate::db::schema::ReserveLog::{block_number as reserveLog_block_number};
+use crate::db::schema::ReserveLog::{block_number as reserveLog_block_number, log_index, pair_address as reserveLog_pair_address, reserve0, reserve1};
 use field_count::FieldCount;
 
 #[derive(Insertable, Debug)]
@@ -58,7 +59,8 @@ pub struct NewReserveLog {
     pub reserve1: String,
     pub block_number: i64,
     pub block_hash: String,
-    pub transaction_hash: String
+    pub transaction_hash: String,
+    pub log_index: i64
 }
 
 pub fn get_last_reserve_log_block_height(conn: &PgConnection) -> QueryResult<i64> {
@@ -124,23 +126,20 @@ pub struct UpdateReserve {
     pub reserve1: String,
 }
 
-pub fn batch_update_reserves(reserves: Vec<(String, UpdateReserve)>, conn: &PgConnection) -> QueryResult<usize> {
-    let mut execute_success_count = 0;
-    for element in reserves {
-        // println!("Start Update for pair_address: {:?}, reserve: {:?}", element.0, element.1);
-        match update_pair_reserve(element.0, element.1, conn) {
-            Ok(_) => {
-                execute_success_count.add_assign(1);
-            }
-            Err(e) => {
-                println!("Update reserve error: {:?}", e);
-            }
-        }
-    }
-    Ok(execute_success_count)
-}
+// pub fn get_latest_pair_reserves(pair_address_: String, conn: &PgConnection) -> QueryResult<(String, String)> {
+//     // SELECT * FROM "ReserveLog" WHERE pair_address = '0x295685c8fe08d8192981d21ea1fe856a07443920' ORDER BY (block_number, "ReserveLog".id) DESC
+//     ReserveLog::table
+//         .select((reserve0, reserve1))
+//         .filter(reserveLog_pair_address.eq(pair_address_.as_str()))
+//         .order_by(reserveLog_block_number.desc())
+//         .then_order_by(log_index.desc())
+//         .limit(1)
+//         .get_result()
+// }
 
 pub fn update_pair_reserve(pair_address_: String, reserve: UpdateReserve, conn: &PgConnection) -> QueryResult<usize> {
+    // UPDATE "Pair" SET reserve0 = '1', reserve1 = '2' WHERE pair_address = '0x295685c8fe08d8192981d21ea1fe856a07443920';
+
     diesel::update(Pair::table.filter(pair_address.eq(pair_address_.as_str())))
         .set(&reserve)
         .execute(conn)

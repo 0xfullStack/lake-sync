@@ -54,8 +54,7 @@ pub struct Node {
 #[derive(Debug, Clone)]
 pub enum Protocol {
     UNISwapV2,
-    UNISwapV3,
-    SushiSwapV2
+    SushiSwapV2,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -71,9 +70,6 @@ impl Protocol {
                 H160::from_str("0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac").unwrap()
             },
             Protocol::UNISwapV2 => {
-                H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
-            }
-            Protocol::UNISwapV3 => {
                 H160::from_str("0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f").unwrap()
             }
         }
@@ -103,29 +99,15 @@ impl Protocol {
                     factory_address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f".to_string().to_lowercase()
                 }
             }
-            Protocol::UNISwapV3 => {
-                NewProtocol {
-                    name: "Uniswap Protocol".to_string(),
-                    official_url: Some("https://uniswap.org/".to_string()),
-                    network: "ETHEREUM_MAINNET".to_string(),
-                    description: Some("Swap, earn, and build on the leading decentralized crypto trading protocol.".to_string()),
-                    symbol: Some("uniswap-v3".to_string()),
-                    router_address: "".to_string(),
-                    factory_address: "".to_string().to_lowercase()
-                }
-            }
         }
     }
 
-    fn created_at_block_number(&self) -> U64 {
+    fn coinbase(&self) -> U64 {
         match self {
             Protocol::SushiSwapV2 => {
                 U64::from(10000835)
             },
             Protocol::UNISwapV2 => {
-                U64::from(10000835)
-            }
-            Protocol::UNISwapV3 => {
                 U64::from(10000835)
             }
         }

@@ -83,9 +83,11 @@ impl Subscriber {
 
         let ws = Ws::connect(self.node.clone()).await.unwrap();
         let provider = Provider::new(ws).interval(Duration::from_millis(500));
-        let block_number = BlockNumber::Number(U64::from(10000835));
+        let from = BlockNumber::Number(U64::from(13000835));
+        let to = BlockNumber::Number(U64::from(13200835));
         let filter = Filter::default()
-            .from_block(block_number)
+            // .from_block(from)
+            // .to_block(to)
             .topic0(Value(event.topic_hash()));
 
         let stream_result = provider.subscribe_logs(&filter).await;

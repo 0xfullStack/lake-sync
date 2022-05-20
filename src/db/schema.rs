@@ -35,6 +35,7 @@ table! {
         block_number -> Int8,
         block_hash -> Text,
         transaction_hash -> Text,
+        log_index -> Int8,
     }
 }
 
