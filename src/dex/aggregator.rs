@@ -38,7 +38,7 @@ impl Aggregator {
 
     pub async fn start_syncing(&self) {
         self.assembler.polling(EventType::Sync).await;
-        self.assembler.polling(EventType::PairCreated).await;
+        // self.assembler.polling(EventType::PairCreated).await;
         // self.subscriber.start_watching().await;
     }
 }

@@ -11,7 +11,7 @@ use ethers::types::U64;
 use std::option::Option;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
-use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewReserveLog, UpdateReserve};
+use crate::dex::models::{get_last_pair_block_height, get_last_reserve_log_block_height, NewPair, NewReserveLog};
 use crate::{EventType, Protocol};
 
 #[derive(Clone)]
@@ -135,16 +135,6 @@ impl Assembler {
         }
     }
 
-    fn syncing_reserves_into_db(&self) {
-        let conn = &self.pool.get().unwrap();
-
-        // get_latest_pair_reserves()
-
-
-
-        // batch_update_reserves(conn);
-    }
-
     async fn fetch_pairs_logs(&self, from: U64, to: U64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
             .address(ValueOrArray::Value(self.protocol.factory_address()))
@@ -234,9 +224,7 @@ impl NewPair {
             token1: format!("0x{}", token1),
             block_number,
             block_hash,
-            transaction_hash,
-            reserve0: "".to_string(),
-            reserve1: "".to_string(),
+            transaction_hash
         }
     }
 }
@@ -244,10 +232,13 @@ impl NewPair {
 impl NewReserveLog {
 
     pub(crate) fn construct_by(log: &Log) -> Self {
-        let reserve_info = NewReserveLog::extract_reserve_info(log);
-        let pair_address = reserve_info.0;
+        let data = &log.data.to_vec();
+        let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
         let block_number = log.block_number.unwrap().as_u64() as i64;
         let log_index = log.log_index.unwrap().as_u64() as i64;
+        let reserve0 = parameters[0].clone().into_uint().unwrap().to_string();
+        let reserve1 = parameters[1].clone().into_uint().unwrap().to_string();
+        let pair_address = format!("0x{}", log.address.into_token().to_string());
         let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
         let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
         block_hash.retain(|c| c != '\"');
@@ -256,20 +247,11 @@ impl NewReserveLog {
         NewReserveLog {
             pair_address,
             block_number,
-            reserve0: reserve_info.1.reserve0,
-            reserve1: reserve_info.1.reserve1,
+            reserve0,
+            reserve1,
             block_hash,
             log_index,
             transaction_hash
         }
-    }
-
-    pub (crate) fn extract_reserve_info(log: &Log) -> (String, UpdateReserve) {
-        let data = &log.data.to_vec();
-        let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
-        let reserve0 = parameters[0].clone().into_uint().unwrap().to_string();
-        let reserve1 = parameters[1].clone().into_uint().unwrap().to_string();
-        let pair_address = format!("0x{}", log.address.into_token().to_string());
-        (pair_address, UpdateReserve { reserve0, reserve1 })
     }
 }

@@ -8,8 +8,6 @@ table! {
         block_number -> Int8,
         block_hash -> Text,
         transaction_hash -> Text,
-        reserve0 -> Text,
-        reserve1 -> Text,
     }
 }
 

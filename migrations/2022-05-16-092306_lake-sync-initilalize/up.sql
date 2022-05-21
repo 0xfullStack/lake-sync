@@ -24,8 +24,6 @@ CREATE TABLE "Pair" (
     "block_number" bigint NOT NULL,
     "block_hash" text NOT NULL,
     "transaction_hash" text NOT NULL,
-    "reserve0" text NOT NULL,
-    "reserve1" text NOT NULL,
     PRIMARY KEY ("id"),
     CONSTRAINT "pair_id" UNIQUE ("id"),
     CONSTRAINT "pair_address" UNIQUE ("pair_address")
@@ -46,6 +44,8 @@ CREATE TABLE "ReserveLog" (
 
 ALTER TABLE "Pair" ADD CONSTRAINT "fk_protocol_factory_address" FOREIGN KEY ("factory_address") REFERENCES "Protocol" ("factory_address");
 -- ALTER TABLE "ReserveLog" ADD CONSTRAINT "fk_pair_pair_address" FOREIGN KEY ("pair_address") REFERENCES "Pair" ("pair_address");
+ALTER TABLE "ReserveLog" ADD CONSTRAINT reserve_block_number_log_index UNIQUE("block_number", "log_index");
+
 
 CREATE INDEX "index_pair_block_number" ON "Pair" ("block_number");
 CREATE INDEX "index_pair_factory_address" ON "Pair" ("factory_address");

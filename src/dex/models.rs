@@ -33,9 +33,7 @@ pub struct NewPair {
     pub token1: String,
     pub block_number: i64,
     pub block_hash: String,
-    pub transaction_hash: String,
-    pub reserve0: String,
-    pub reserve1: String
+    pub transaction_hash: String
 }
 
 pub fn batch_insert_pairs(pairs: Vec<NewPair>, conn: &PgConnection) -> QueryResult<usize> {
@@ -119,13 +117,6 @@ pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) 
     }
 }
 
-#[derive(AsChangeset, Debug)]
-#[table_name="Pair"]
-pub struct UpdateReserve {
-    pub reserve0: String,
-    pub reserve1: String,
-}
-
 pub fn get_latest_pair_reserves(pair_address_: String, conn: &PgConnection) -> QueryResult<(String, String)> {
     // SELECT * FROM "ReserveLog" WHERE pair_address = '0xe0cc5afc0ff2c76183416fb8d1a29f6799fb2cdf' ORDER BY (block_number, log_index) DESC
     ReserveLog::table
@@ -134,12 +125,4 @@ pub fn get_latest_pair_reserves(pair_address_: String, conn: &PgConnection) -> Q
         .order_by((reserveLog_block_number.desc(), log_index.desc()))
         .limit(1)
         .get_result(conn)
-}
-
-pub fn update_pair_reserve(pair_address_: String, reserve: UpdateReserve, conn: &PgConnection) -> QueryResult<usize> {
-    // UPDATE "Pair" SET reserve0 = '1', reserve1 = '2' WHERE pair_address = '0x295685c8fe08d8192981d21ea1fe856a07443920';
-
-    diesel::update(Pair::table.filter(pair_address.eq(pair_address_.as_str())))
-        .set(&reserve)
-        .execute(conn)
 }
