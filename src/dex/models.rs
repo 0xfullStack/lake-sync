@@ -1,6 +1,5 @@
 use std::ops::AddAssign;
 use diesel::prelude::*;
-use diesel::query_dsl::methods::ThenOrderDsl;
 use crate::db::schema::{Protocol, Pair, ReserveLog};
 use crate::db::schema::Pair::{pair_address, block_number};
 use crate::db::schema::ReserveLog::{block_number as reserveLog_block_number, log_index, pair_address as reserveLog_pair_address, reserve0, reserve1};
@@ -115,14 +114,4 @@ pub fn batch_insert_reserve_logs(logs: Vec<NewReserveLog>, conn: &PgConnection) 
         let count = insert_reserve_logs(&logs, conn).unwrap_or(0);
         Ok(count)
     }
-}
-
-pub fn get_latest_pair_reserves(pair_address_: String, conn: &PgConnection) -> QueryResult<(String, String)> {
-    // SELECT * FROM "ReserveLog" WHERE pair_address = '0xe0cc5afc0ff2c76183416fb8d1a29f6799fb2cdf' ORDER BY (block_number, log_index) DESC
-    ReserveLog::table
-        .select((reserve0, reserve1))
-        .filter(reserveLog_pair_address.eq(pair_address_.as_str()))
-        .order_by((reserveLog_block_number.desc(), log_index.desc()))
-        .limit(1)
-        .get_result(conn)
 }
