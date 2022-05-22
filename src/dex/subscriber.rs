@@ -1,12 +1,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 use diesel::QueryResult;
-use ethers::abi::Tokenizable;
 
 use tokio;
 use ethers::prelude::*;
 use ethers::prelude::ValueOrArray::Value;
-use ethers::types::U64;
 use crate::db::postgres::PgPool;
 use crate::dex::models::{NewPair, *};
 use crate::{EventType, Protocol};

@@ -1,13 +1,11 @@
-use std::ops::{Add, Div, Mul, Sub, SubAssign};
+use std::ops::{Add, Div, Mul, Sub};
 use std::sync::Arc;
 use diesel::QueryResult;
 
 use ethers::prelude::*;
-use ethers::abi::Tokenizable;
-use ethers::prelude::ValueOrArray::Value;
-use ethers::abi::ParamType;
 use ethers::providers::Http;
 use ethers::types::U64;
+use ethers::prelude::ValueOrArray::Value;
 use std::option::Option;
 use crate::db::postgres::PgPool;
 use crate::dex::models;
@@ -52,8 +50,8 @@ impl Assembler {
             let range_per_loop = Assembler::get_block_range_per_loop(total_range, blocks_per_loop);
             let from = range_per_loop.from;
             let to = range_per_loop.to;
-            let mut thread_count = event.max_threads_count().as_u32();
-            let mut blocks_per_thread = blocks_per_loop.div(thread_count);
+            let thread_count = event.max_threads_count().as_u32();
+            let blocks_per_thread = blocks_per_loop.div(thread_count);
             if range_per_loop.size < blocks_per_thread {
                 self.handle_task(from, to, event).await;
                 meet_last_loop = true;
@@ -61,7 +59,7 @@ impl Assembler {
                 let mut threads = Vec::new();
                 for index in 0..thread_count {
                     let clone_self = self.clone();
-                    let mut thread_from = from.add(blocks_per_thread.mul(index));
+                    let thread_from = from.add(blocks_per_thread.mul(index));
                     let mut thread_to= thread_from.add(blocks_per_thread).sub(1);
 
                     if thread_from > from && thread_to > to { continue }
@@ -142,7 +140,7 @@ impl Assembler {
 
     async fn fetch_pairs_logs(&self, from: U64, to: U64) -> Result<Vec<Log>, ProviderError> {
         let filter = Filter::default()
-            .address(ValueOrArray::Value(self.protocol.factory_address()))
+            .address(Value(self.protocol.factory_address()))
             .topic0(Value(EventType::PairCreated.topic_hash()))
             .from_block(BlockNumber::Number(from))
             .to_block(BlockNumber::Number(to));
@@ -205,58 +203,6 @@ impl Assembler {
             EventType::Sync => {
                 U64::from(get_last_reserve_log_block_height(conn).unwrap_or(0))
             }
-        }
-    }
-}
-
-impl NewPair {
-    pub(crate) fn construct_by(log: &Log, factory_address: H160) -> Self {
-        let data = &log.data.to_vec();
-        let factory_address = factory_address.into_token().to_string();
-        let pair_address = ethers::abi::decode(&vec![ParamType::Address, ParamType::Uint(256)], data).unwrap()[0].to_string();
-        let token0 = ethers::abi::decode(&vec![ParamType::Address], log.topics[1].as_bytes()).unwrap()[0].to_string();
-        let token1 = ethers::abi::decode(&vec![ParamType::Address], log.topics[2].as_bytes()).unwrap()[0].to_string();
-        let block_number = log.block_number.unwrap().as_u64() as i64;
-        let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
-        let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
-        block_hash.retain(|c| c != '\"');
-        transaction_hash.retain(|c| c != '\"');
-
-        NewPair {
-            pair_address: format!("0x{}", pair_address),
-            factory_address: format!("0x{}", factory_address),
-            token0: format!("0x{}", token0),
-            token1: format!("0x{}", token1),
-            block_number,
-            block_hash,
-            transaction_hash
-        }
-    }
-}
-
-impl NewReserveLog {
-
-    pub(crate) fn construct_by(log: &Log) -> Self {
-        let data = &log.data.to_vec();
-        let parameters = ethers::abi::decode(&vec![ParamType::Uint(112), ParamType::Uint(112)], data).unwrap();
-        let block_number = log.block_number.unwrap().as_u64() as i64;
-        let log_index = log.log_index.unwrap().as_u64() as i64;
-        let reserve0 = parameters[0].clone().into_uint().unwrap().to_string();
-        let reserve1 = parameters[1].clone().into_uint().unwrap().to_string();
-        let pair_address = format!("0x{}", log.address.into_token().to_string());
-        let mut block_hash = serde_json::to_string(&log.block_hash.unwrap_or(H256::zero())).unwrap();
-        let mut transaction_hash = serde_json::to_string(&log.transaction_hash.unwrap_or(H256::zero())).unwrap();
-        block_hash.retain(|c| c != '\"');
-        transaction_hash.retain(|c| c != '\"');
-
-        NewReserveLog {
-            pair_address,
-            block_number,
-            reserve0,
-            reserve1,
-            block_hash,
-            log_index,
-            transaction_hash
         }
     }
 }
