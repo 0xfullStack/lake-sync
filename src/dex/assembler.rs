@@ -58,18 +58,22 @@ impl Assembler {
                 self.handle_task(from, to, event).await;
                 meet_last_loop = true;
             } else {
-                let mut tasks = Vec::new();
+                let mut threads = Vec::new();
                 for index in 0..thread_count {
                     let clone_self = self.clone();
-                    let from = from.add(blocks_per_thread.mul(index));
-                    let to= from.add(blocks_per_thread).sub(1);
-                    let task = tokio::spawn(async move {
-                        clone_self.handle_task(from, to, event).await;
+                    let mut thread_from = from.add(blocks_per_thread.mul(index));
+                    let mut thread_to= thread_from.add(blocks_per_thread).sub(1);
+
+                    if thread_from > from && thread_to > to { continue }
+                    if thread_to > to { thread_to = to }
+
+                    let thread = tokio::spawn(async move {
+                        clone_self.handle_task(thread_from, thread_to, event).await;
                     });
-                    tasks.push(task);
+                    threads.push(thread);
                 }
-                for task in tasks {
-                    task.await;
+                for thread in threads {
+                    thread.await;
                 }
             }
             scanned_block_cursor = Some(to);
@@ -99,6 +103,7 @@ impl Assembler {
                 }
             }
             Err(e) => {
+                // TODO: Add error handle
                 println!(" - 2 - Fetching {:?} logs failure from: {:?} to: {:?}, error: {:?}, cut by half", event, from, to, e);
             }
         }
