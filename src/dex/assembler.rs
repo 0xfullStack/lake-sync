@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Sub};
 use std::sync::Arc;
 use diesel::QueryResult;
 
@@ -81,28 +81,56 @@ impl Assembler {
     }
 
     async fn handle_task(&self, from: U64, to: U64, event: EventType) {
-        let result;
-        match event {
-            EventType::PairCreated => {
-                println!(" - 1 - Start {:?} logs syncing from: {:?} to: {:?}", event, from, to);
-                result = self.fetch_pairs_logs(from, to).await;
-            }
-            EventType::Sync => {
-                println!(" - 1 - Start {:?} logs syncing from: {:?} to: {:?}", event, from, to);
-                result = self.fetch_reserve_logs(from, to).await;
-            }
-        }
 
-        match result {
-            Ok(logs) => {
-                println!(" - 2 - Fetching {:?} {:?} logs successfully from: {:?} to: {:?}", event, logs.len(), from, to);
-                if logs.len() > 0 {
-                    self.syncing_logs_into_db(logs, event);
+        println!(" - 1 - Start {:?} logs syncing from: {:?} to: {:?}", event, from, to);
+
+        let total_size = to.sub(from).add(1);
+        let mut cut_factor: U64 = U64::one();
+        let mut range = BlockRange { from, to, size: to.sub(from).add(1) };
+
+        loop {
+
+            let result;
+            match event {
+                EventType::PairCreated => {
+                    result = self.fetch_pairs_logs(range.from, range.to).await;
+                }
+                EventType::Sync => {
+                    result = self.fetch_reserve_logs(range.from, range.to).await;
                 }
             }
-            Err(e) => {
-                // TODO: Add error handle
-                println!(" - 2 - Fetching {:?} logs failure from: {:?} to: {:?}, error: {:?}, cut by half", event, from, to, e);
+
+            match result {
+                Ok(logs) => {
+                    println!(" - 2 - Fetching {:?} {:?} logs successfully from: {:?} to: {:?}", event, logs.len(), range.from, range.to);
+                    if logs.len() > 0 {
+                        self.syncing_logs_into_db(logs, event);
+                    }
+                    if cut_factor == U64::one() {
+                        break;
+                    } else {
+                        let size = total_size.div(cut_factor);
+                        let mut loop_from = range.to.add(1);
+                        let mut loop_to = loop_from.add(size).sub(1);
+
+                        if loop_from > from && loop_to > to { break; }
+                        if loop_to > to { loop_to = to; }
+
+                        range.from = loop_from;
+                        range.to = loop_to;
+                        range.size = size;
+                    }
+                }
+                Err(e) => {
+                    println!(" - 2 - Fetching {:?} logs failure from: {:?} to: {:?}, error: {:?}", event, range.from, range.to, e);
+
+                    cut_factor.mul_assign(2);
+                    let size = total_size.div(cut_factor);
+                    range.from = from;
+                    range.to = from.add(size).sub(1);
+                    range.size = size;
+                    println!("       - - -> Cut by half, with factor {:?} to retry {:?} syncing", cut_factor, event);
+                }
             }
         }
     }
