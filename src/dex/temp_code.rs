@@ -119,3 +119,34 @@
 //         )
 //     }
 // }
+
+
+// fn load_eligible_addresses(&self, to: i64) -> Vec<Address> {
+//     let from = self.protocol.star_block_number().as_u64() as i64;
+//     let conn = &self.pool.get().unwrap();
+//     let addresses_from_db = get_addresses(conn, from, to).unwrap();
+//     println!("eligible_addresses: {}", addresses_from_db.len());
+//
+//     addresses_from_db
+//         .iter()
+//         .map(|address| {
+//             Address::from_str(address.as_str()).unwrap()
+//         })
+//         .collect()
+// }
+
+// code: -32602, message: "Log response size exceeded.
+// You can make eth_getLogs requests with up to a 2K block range and no limit on the response size,
+// or you can request any block range with a cap of 10K logs in the response. Based on your parameters and the response size limit,
+// this block range should work: [0xa0beb9, 0xa0c2f5]", data: None }))
+
+
+
+// type DBError = Box<dyn std::error::Error + Send + Sync>;
+// pub fn get_addresses(conn: &PgConnection, from_block_number: i64, to_block_number: i64) -> Result<Vec<String>, DBError> {
+//     let address_list = pairs::table
+//         .filter(block_number.between(from_block_number, to_block_number))
+//         .select(pair_address)
+//         .load::<String>(conn)?;
+//     Ok(address_list)
+// }

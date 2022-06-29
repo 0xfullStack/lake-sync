@@ -30,8 +30,8 @@ async fn main() -> std::io::Result<()> {
     let pool = init_pool(&database_url).expect("Failed to create pool");
 
     // Node
-    let http = (&env::var("INFURA_NODE_HTTP").unwrap()).to_string();
-    let ws   = (&env::var("ALCHEMY_NODE_WS").unwrap()).to_string();
+    let http = (&env::var("CRYPTOLESS_NODE_HTTP").unwrap()).to_string();
+    let ws   = (&env::var("CRYPTOLESS_NODE_WS").unwrap()).to_string();
 
     // Start Service
     let aggregator = Aggregator::make(
@@ -45,6 +45,7 @@ async fn main() -> std::io::Result<()> {
 
     Ok(())
 }
+
 
 pub struct Node {
     pub http: String,
